@@ -91,3 +91,29 @@ def test_trade_markers_pick_live_and_shadow_fills_and_ai_vetoes(tmp_path) -> Non
     assert sorted(markers["kind"]) == ["entry", "exit", "vetoed"]
     assert markers.set_index("kind").loc["entry", "price"] == 100
     assert markers.set_index("kind").loc["exit", "price"] == 110
+
+
+def test_equity_stats_measure_peak_to_trough_drawdown() -> None:
+    import pandas as pd
+
+    from wallex_engine.reporting.results import equity_curve
+
+    snapshots = pd.DataFrame(
+        {
+            "run_id": ["live-a"] * 4 + ["shadow-b"],
+            "captured_at": [
+                "2026-10-23 08:00:00",
+                "2026-10-23 09:00:00",
+                "2026-10-23 10:00:00",
+                "2026-10-23 11:00:00",
+                "2026-10-23 08:00:00",
+            ],
+            "equity_tmn": ["5000000", "5100000", "4998000", "5050000", "5000000"],
+        }
+    )
+    curve, stats = equity_curve(snapshots, "live-a", 5_000_000)
+    assert list(curve["equity"]) == [5_000_000, 5_100_000, 4_998_000, 5_050_000]
+    assert round(curve["drawdown"].max(), 4) == 0.02
+    assert round(stats["return"], 4) == 0.01
+    assert round(stats["max_drawdown"], 4) == 0.02
+    assert stats["hours"] == 3

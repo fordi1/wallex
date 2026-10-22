@@ -95,6 +95,31 @@ def trade_markers(frame: pd.DataFrame, symbol: str) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
+def equity_curve(
+    snapshots: pd.DataFrame, run_id: str, baseline: float
+) -> tuple[pd.DataFrame, dict[str, float]]:
+    """One run's equity with peak-to-trough drawdown (the peak starts at the baseline)."""
+    run = snapshots[snapshots["run_id"] == run_id].copy()
+    run["captured_at"] = pd.to_datetime(run["captured_at"], utc=True)
+    run = run.sort_values("captured_at")
+    curve = pd.DataFrame(
+        {
+            "captured_at": run["captured_at"].to_numpy(),
+            "equity": pd.to_numeric(run["equity_tmn"]).to_numpy(),
+        }
+    )
+    peak = curve["equity"].cummax().clip(lower=baseline)
+    curve["drawdown"] = (peak - curve["equity"]) / peak
+    if curve.empty:
+        return curve, {"return": 0.0, "max_drawdown": 0.0, "hours": 0.0}
+    span = curve["captured_at"].iloc[-1] - curve["captured_at"].iloc[0]
+    return curve, {
+        "return": float(curve["equity"].iloc[-1] / baseline - 1),
+        "max_drawdown": float(curve["drawdown"].max()),
+        "hours": span.total_seconds() / 3600,
+    }
+
+
 def _number(value: object) -> float | None:
     try:
         return float(value) if value is not None else None

@@ -30,6 +30,7 @@ from wallex_engine.models import MarketSpec, SignalAction  # noqa: E402
 from wallex_engine.reporting.results import (  # noqa: E402
     decision_frame,
     decision_summary,
+    equity_curve,
     load_sweeps,
     parse_report_tables,
     trade_markers,
@@ -1199,7 +1200,12 @@ def render_engine_control(config) -> None:
 
 
 OUTCOME_LABELS = {"filled": "اجرا شد", "skipped": "ورود نکرد", "rejected": "رد شد"}
-SWEEP_LABELS = {"sweep_15m": "۱۵ دقیقه", "sweep_5m": "۵ دقیقه", "param_sweep": "دور اول"}
+SWEEP_LABELS = {
+    "sweep_15m_realfees": "۱۵ دقیقه · کارمزد واقعی",
+    "sweep_15m": "۱۵ دقیقه",
+    "sweep_5m": "۵ دقیقه",
+    "param_sweep": "دور اول",
+}
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -1209,6 +1215,14 @@ def load_decisions(path: str, modified: float) -> pd.DataFrame:
 
 def _percent_points(value: object) -> str:
     return f"{format_number(value, 3)}٪"
+
+
+def _fine_percent(fraction: object) -> str:
+    """Percent with three decimals; challenge-scale returns are often below 0.01%."""
+    try:
+        return _percent_points(float(fraction) * 100)
+    except (TypeError, ValueError):
+        return "—"
 
 
 def render_ai_comparison(config) -> None:
@@ -1227,11 +1241,11 @@ def render_ai_comparison(config) -> None:
     chosen = st.selectbox("بازار", list(labels), format_func=labels.get, key="ai_report")
     _, metrics, comparison = next(r for r in reports if str(r[0]) == chosen)
     first = st.columns(2)
-    first[0].metric("بازده AI روشن", format_percent(comparison.get("بازده AI روشن")))
-    first[1].metric("بازده AI خاموش", format_percent(comparison.get("بازده AI خاموش")))
+    first[0].metric("بازده AI روشن", _fine_percent(comparison.get("بازده AI روشن")))
+    first[1].metric("بازده AI خاموش", _fine_percent(comparison.get("بازده AI خاموش")))
     second = st.columns(2)
-    second[0].metric("افت سرمایه AI روشن", format_percent(comparison.get("افت سرمایه AI روشن")))
-    second[1].metric("افت سرمایه AI خاموش", format_percent(comparison.get("افت سرمایه AI خاموش")))
+    second[0].metric("افت سرمایه AI روشن", _fine_percent(comparison.get("افت سرمایه AI روشن")))
+    second[1].metric("افت سرمایه AI خاموش", _fine_percent(comparison.get("افت سرمایه AI خاموش")))
     third = st.columns(2)
     third[0].metric("اختلاف سود تحقق‌یافته", format_money(comparison.get("اختلاف سود تحقق‌یافته")))
     third[1].metric("اختلاف تعداد معاملات", format_number(comparison.get("اختلاف تعداد معاملات")))
@@ -1347,9 +1361,138 @@ def render_decision_explorer(config) -> None:
     )
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def load_equity_snapshots() -> pd.DataFrame:
+    with database_engine().connect() as connection:
+        return pd.read_sql(
+            text("SELECT run_id, captured_at, equity_tmn FROM equity_snapshots"), connection
+        )
+
+
+def _run_label(run_id: str, started: object) -> str:
+    mode = run_id.split("-", 1)[0]
+    return f"{MODE_LABELS.get(mode, mode)} · {format_datetime(started)}"
+
+
+def equity_figure(curve: pd.DataFrame, baseline: float) -> go.Figure:
+    figure = make_subplots(
+        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.06, row_heights=[0.7, 0.3]
+    )
+    labels = curve["captured_at"].map(format_datetime)
+    figure.add_trace(
+        go.Scatter(
+            x=curve["captured_at"],
+            y=curve["equity"],
+            name="ارزش سبد",
+            mode="lines",
+            line={"color": CHART_PRIMARY, "width": 2},
+            customdata=list(zip(labels, curve["equity"].map(format_money), strict=True)),
+            hovertemplate="%{customdata[0]}<br>ارزش سبد: %{customdata[1]}<extra></extra>",
+        ),
+        row=1,
+        col=1,
+    )
+    figure.add_hline(
+        y=baseline,
+        line_dash="dash",
+        line_color=CHART_MUTED,
+        annotation_text="سرمایه آغازین",
+        row=1,
+        col=1,
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=curve["captured_at"],
+            y=-curve["drawdown"] * 100,
+            name="افت سرمایه",
+            mode="lines",
+            fill="tozeroy",
+            line={"color": CHART_DESTRUCTIVE, "width": 1.4},
+            fillcolor="rgba(192,29,32,0.12)",
+            customdata=curve["drawdown"].map(format_percent),
+            hovertemplate="افت سرمایه: %{customdata}<extra></extra>",
+        ),
+        row=2,
+        col=1,
+    )
+    values = curve["equity"]
+    low, high = min(float(values.min()), baseline), max(float(values.max()), baseline)
+    step = (high - low) / 4 if high != low else 1
+    price_ticks = [low + step * index for index in range(5)] if high != low else [low]
+    figure.update_yaxes(
+        tickvals=price_ticks, ticktext=[format_number(v) for v in price_ticks], row=1, col=1
+    )
+    deepest = max(float(curve["drawdown"].max()) * 100, 0.01)
+    dd_ticks = [0, -deepest / 2, -deepest]
+    figure.update_yaxes(
+        tickvals=dd_ticks, ticktext=[_percent_points(v) for v in dd_ticks], row=2, col=1
+    )
+    if len(curve):
+        indexes = sorted(set(int(i) for i in np.linspace(0, len(curve) - 1, 4)))
+        figure.update_xaxes(
+            tickvals=[curve["captured_at"].iloc[i] for i in indexes],
+            ticktext=[labels.iloc[i].rsplit("، ", 1)[-1] for i in indexes],
+        )
+    figure.update_layout(
+        height=420,
+        margin={"l": 10, "r": 10, "t": 20, "b": 24},
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor=CHART_SURFACE,
+        font={"family": "Vazirmatn, Tahoma, sans-serif", "color": CHART_FOREGROUND},
+        hoverlabel={"align": "right", "font": {"family": "Vazirmatn, Tahoma, sans-serif"}},
+        hovermode="x unified",
+        showlegend=False,
+        dragmode="pan",
+    )
+    figure.update_xaxes(showgrid=False)
+    figure.update_yaxes(gridcolor=CHART_GRID, zeroline=False, automargin=True)
+    return figure
+
+
+def render_equity_section(config) -> None:
+    st.subheader("ارزش سبد و افت سرمایه")
+    try:
+        snapshots = load_equity_snapshots()
+    except Exception:
+        st.info("پایگاه‌داده اجرای سایه یا واقعی در دسترس نیست.")
+        return
+    snapshots = snapshots[snapshots["run_id"].str.match(r"^(shadow|live)-", na=False)]
+    if snapshots.empty:
+        st.info("هنوز اجرای سایه یا واقعی ثبت نشده است.")
+        return
+    starts = snapshots.groupby("run_id")["captured_at"].min().sort_values(ascending=False)
+    # Live runs first, each group newest first.
+    runs = [r for r in starts.index if r.startswith("live-")] + [
+        r for r in starts.index if not r.startswith("live-")
+    ]
+    run_id = st.selectbox(
+        "اجرا", runs, format_func=lambda run: _run_label(run, starts[run]), key="equity_run"
+    )
+    baseline = float(config.challenge.initial_capital_tmn)
+    curve, stats = equity_curve(snapshots, run_id, baseline)
+    cards = st.columns(2)
+    cards[0].metric("ارزش فعلی", format_money(curve["equity"].iloc[-1]))
+    cards[1].metric("بازده", _fine_percent(stats["return"]))
+    cards = st.columns(2)
+    cards[0].metric("بیشترین افت از قله", _fine_percent(stats["max_drawdown"]))
+    cards[1].metric("مدت اجرا", format_duration(stats["hours"] * 3600))
+    st.plotly_chart(
+        equity_figure(curve, baseline),
+        width="stretch",
+        config={"displaylogo": False, "scrollZoom": True},
+    )
+    st.caption(
+        f"سقف‌های فعال: توقف روزانه {format_percent(config.risk.daily_loss_stop)} · "
+        f"نصف شدن حجم در {format_percent(config.risk.halve_size_drawdown)} · "
+        f"توقف اضطراری در {format_percent(config.risk.kill_switch_drawdown)}"
+    )
+
+
 def render_results(config) -> None:
     st.title("نتایج و شواهد")
     st.caption("همه اعداد از گزارش‌ها و لاگ تصمیم همین مخزن خوانده می‌شوند.")
+    render_equity_section(config)
+    st.divider()
     render_ai_comparison(config)
     st.divider()
     render_walk_forward(config)
