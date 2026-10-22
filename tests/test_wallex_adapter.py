@@ -102,3 +102,31 @@ async def test_fees_are_per_symbol_with_conservative_fallback(monkeypatch) -> No
         await client.close()
     assert (btc.maker, btc.taker) == (Decimal("0.0025"), Decimal("0.003"))
     assert (worst.maker, worst.taker) == (Decimal("0.004"), Decimal("0.005"))
+
+
+@pytest.mark.asyncio
+async def test_tickers_parse_market_stats(monkeypatch) -> None:
+    payload = {
+        "result": {
+            "symbols": {
+                "BTCTMN": {
+                    "stats": {
+                        "lastPrice": "22062999871.0",
+                        "24h_ch": -2.39,
+                        "24h_highPrice": "22619999994",
+                        "24h_lowPrice": "21660000000",
+                        "24h_quoteVolume": "101222712575.31",
+                    }
+                },
+                "EMPTYTMN": {"stats": {"lastPrice": "-"}},
+            }
+        }
+    }
+    client = await _client_returning(monkeypatch, payload)
+    try:
+        tickers = await client.get_tickers(["BTCTMN", "EMPTYTMN"])
+    finally:
+        await client.close()
+    assert tickers["BTCTMN"]["last"] == Decimal("22062999871.0")
+    assert tickers["BTCTMN"]["change_24h"] == Decimal("-2.39")
+    assert "EMPTYTMN" not in tickers

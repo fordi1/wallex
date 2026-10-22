@@ -36,6 +36,16 @@ python main.py report --run-id RUN_ID
 streamlit run dashboard.py
 ```
 
+Trading terminal (TradingView-style chart, backtest/shadow/live tabs, AI model
+settings) on this machine only:
+
+```powershell
+python terminal.py   # then open http://127.0.0.1:8600
+```
+
+It has no password but accepts requests only from its own page on 127.0.0.1;
+the live tab still needs an explicit confirmation and every live gate.
+
 Environment variables are read directly by the process; `.env` is an example,
 not automatically loaded in production. The dashboard needs only
 `DASHBOARD_DATABASE_URL` (a read-only database user) and `DASHBOARD_PASSWORD`.

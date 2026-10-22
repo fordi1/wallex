@@ -142,6 +142,25 @@ class WallexClient:
             markets[market.symbol] = market
         return markets
 
+    async def get_tickers(self, symbols: Sequence[str]) -> dict[str, dict[str, Decimal]]:
+        """Last price and 24h stats per market; markets without a valid last price are skipped."""
+        payload = await self._request("GET", "/v1/markets")
+        markets = _unwrap(payload, "result").get("symbols", {})
+        tickers: dict[str, dict[str, Decimal]] = {}
+        for symbol in symbols:
+            stats = (markets.get(symbol.upper()) or {}).get("stats") or {}
+            try:
+                tickers[symbol.upper()] = {
+                    "last": _decimal(stats["lastPrice"]),
+                    "change_24h": _decimal(stats.get("24h_ch", 0)),
+                    "high_24h": _decimal(stats.get("24h_highPrice", 0)),
+                    "low_24h": _decimal(stats.get("24h_lowPrice", 0)),
+                    "volume_tmn": _decimal(stats.get("24h_quoteVolume", 0)),
+                }
+            except (KeyError, ArithmeticError, ValueError):
+                continue
+        return tickers
+
     async def get_candles(
         self, symbol: str, timeframe_minutes: int, start: datetime, end: datetime
     ) -> list[Candle]:
