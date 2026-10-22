@@ -74,45 +74,42 @@
 
   .bottom { grid-area: bottom; border-top: 1px solid var(--border); background: var(--panel);
     display: flex; flex-direction: column; height: 360px; min-width: 0; }
-  .bottom-tabs { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+  .bottom-title { margin: 0; padding: 10px 12px 0; font-size: 15px; font-weight: 700; }
   .pad { padding: 10px 12px; } .small { font-size: 12px; } .grow { flex: 1; min-width: 0; }
-  .xhead { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 10px 0 8px; }
-  .verdict { font-weight: 700; padding: 2px 12px; border-radius: 14px; }
-  .verdict.good { background: rgba(8,153,129,.15); color: var(--up); } .verdict.bad { background: rgba(242,54,69,.12); color: var(--down); }
-  .dots { letter-spacing: 1px; color: var(--up); font-size: 11px; } .dots i { color: var(--border); font-style: normal; }
-  .timeline { display: flex; flex-wrap: wrap; gap: 3px; }
-  .tick { min-height: 22px; width: 14px; padding: 0; border-radius: 3px; border: 0; }
+  .timeline { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 10px; }
+  .tick { min-height: 20px; width: 12px; padding: 0; border-radius: 3px; border: 0; }
   .tick.in { background: var(--up); } .tick.veto { background: var(--warn); } .tick.skip { background: var(--panel-2); }
   .tick.on { outline: 2px solid #fff; outline-offset: 1px; }
-  .legend-row { display: flex; gap: 12px; margin-top: 4px; } .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-left: 4px; vertical-align: middle; }
-  .sw.in { background: var(--up); } .sw.veto { background: var(--warn); } .sw.skip { background: var(--panel-2); }
-  .segs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-  .seg { min-height: 40px; display: inline-flex; gap: 8px; align-items: center; } .seg.on { border-color: var(--accent); color: #fff; }
+  .story { border-right: 4px solid var(--border); padding: 4px 12px 2px; margin-bottom: 10px; }
+  .story.good { border-color: var(--up); } .story.bad { border-color: var(--down); } .story.warn { border-color: var(--warn); }
+  .story .when { color: var(--muted); font-size: 12px; display: block; }
+  .story .headline { font-size: 18px; display: block; margin: 2px 0; }
+  .story.good .headline { color: var(--up); } .story.bad .headline { color: var(--down); } .story.warn .headline { color: var(--warn); }
+  .story p { margin: 0; color: var(--muted); font-size: 13px; }
+  .votes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+  .vote { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
+    min-height: 52px; padding: 4px 10px; font-size: 12px; min-width: 0; }
+  .vote span { color: var(--muted); } .vote b { font-size: 14px; }
+  .vote b { font-weight: 600; } .vote.up b { color: var(--up); } .vote.down b { color: var(--down); } .vote.flat b { color: var(--muted); }
+  .vote.blocked b { color: var(--down); } .vote.open { border-color: var(--accent); }
+  .vote-detail { margin: 8px 0 0; color: var(--text); font-size: 13px; background: var(--bg); border-radius: var(--radius); padding: 8px 10px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
+  .pills b { color: var(--text); font-weight: 600; }
+  .segs { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+  .seg { min-height: 40px; } .seg.on { border-color: var(--accent); color: #fff; }
   .checks { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
   .crow { width: 100%; display: flex; align-items: center; gap: 10px; text-align: right; border: 0; border-radius: 0;
     border-bottom: 1px solid var(--border); background: transparent; min-height: 44px; white-space: normal; }
-  .crow:last-of-type { border-bottom: 0; } .crow.fail .grow { color: #fff; } .crow:not(.fail) .grow { color: var(--muted); }
-  .chev { color: var(--muted); width: 14px; text-align: center; }
-  .cdetail { padding: 6px 14px 10px 14px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 13px; }
+  .crow:last-of-type { border-bottom: 0; } .crow:not(.fail) .grow { color: var(--muted); }
+  .cdetail { padding: 6px 14px 10px; background: var(--bg); border-bottom: 1px solid var(--border); font-size: 13px; }
   .cdetail p { margin: 4px 0 0; color: var(--muted); }
-  .fold { border: 1px solid var(--border); border-radius: var(--radius); margin-top: 8px; padding: 0 12px; }
-  .fold summary { min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; flex-wrap: wrap; }
-  .fold summary::-webkit-details-marker { display: none; } .fold[open] { padding-bottom: 10px; }
-  .fold p { margin: 4px 0; font-size: 13px; }
+  .fold { border: 1px solid var(--border); border-radius: var(--radius); margin-top: 10px; padding: 0 12px; }
+  .fold summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; list-style: none; color: var(--muted); }
+  .fold summary::-webkit-details-marker { display: none; } .fold summary::before { content: "+"; margin-left: 8px; }
+  .fold[open] summary::before { content: "−"; } .fold[open] { padding-bottom: 10px; }
+  .fold p { margin: 6px 0; font-size: 13px; }
+  .log { margin: 6px 0 0; font-size: 11px; white-space: pre-wrap; color: var(--muted); background: var(--bg); padding: 8px; border-radius: var(--radius); }
   .ok { color: var(--up); font-weight: 700; } .no { color: var(--down); font-weight: 700; }
-  .list { margin: 6px 0 0; padding-right: 18px; color: var(--muted); font-size: 13px; }
-  .hero { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin-bottom: 10px; }
-  .hero > div { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; display: flex; flex-direction: column; }
-  .hero span { color: var(--muted); font-size: 12px; } .hero b { font-size: 20px; }
-  .x-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
-  .card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; min-width: 0; }
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; padding: 4px 0; }
-  .metric { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
-  .metric span { color: var(--muted); font-size: 12px; }
-  .limit { margin-bottom: 8px; font-size: 13px; }
-  .bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
-  .bar i { display: block; height: 100%; } .bar i.good { background: var(--up); } .bar i.warn { background: var(--warn); } .bar i.bad { background: var(--down); }
-  .bottom-tabs button.on { border-color: var(--accent); color: #fff; }
   .table-wrap { overflow: auto; flex: 1; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { padding: 6px 12px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
@@ -145,7 +142,7 @@
     .price-big { font-size: 17px; }
     .mode-tabs { flex: 1 1 100%; }
     .mode-tab { flex: 1 1 0; justify-content: center; padding: 0 6px; }
-    .bottom { height: 460px; }
+    .bottom { height: auto; } .bottom .table-wrap { overflow: visible; }
   }
 </style>
 </head>
@@ -189,14 +186,7 @@
   </aside>
 
   <section class="bottom">
-    <div class="bottom-tabs" role="tablist">
-      <button class="on" data-panel="signals">سیگنال‌ها</button>
-      <button data-panel="explain">تحلیل سیگنال</button>
-      <button data-panel="risk">ریسک و سود/زیان</button>
-      <button data-panel="score">معیارهای داوری</button>
-      <button data-panel="prices">قیمت‌ها</button>
-      <button data-panel="log">گزارش موتور</button>
-    </div>
+    <h2 class="bottom-title">سیگنال</h2>
     <div class="table-wrap" id="panel"></div>
   </section>
 </div>
@@ -242,7 +232,7 @@ const pct = v => v == null ? "—" : `${v > 0 ? "+" : ""}${FA2.format(v)}٪`;
 const esc = s => String(s ?? "—").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = id => document.getElementById(id);
 
-const state = { symbol: null, tf: 15, ema: true, vol: true, mode: "shadow", engine: null, markets: null, panel: "signals", signals: [], open: new Set(), selected: null, explain: null, risk: null, score: null, family: null, openCheck: null };
+const state = { symbol: null, tf: 15, ema: true, vol: true, mode: "shadow", engine: null, markets: null, panel: "signal", signals: [], selected: null, explain: null, risk: null, family: null, openCheck: null, openVote: null, detailsOpen: false };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
@@ -309,7 +299,6 @@ async function loadMarkets() {
     select.value = state.symbol;
   }
   renderWatchlist(); renderTop();
-  if (state.panel === "prices") renderPanel();
 }
 function renderTop() {
   const t = state.markets?.tickers[state.symbol];
@@ -327,7 +316,7 @@ function renderWatchlist() {
 $("watchlist").addEventListener("click", e => { const row = e.target.closest("[data-symbol]"); if (row) selectSymbol(row.dataset.symbol); });
 $("watchlist").addEventListener("keydown", e => { const row = e.target.closest("[data-symbol]"); if (row && e.key === "Enter") selectSymbol(row.dataset.symbol); });
 $("symbol").addEventListener("change", e => selectSymbol(e.target.value));
-function selectSymbol(symbol) { state.symbol = symbol; state.selected = null; state.explain = null; $("symbol").value = symbol; renderWatchlist(); renderTop(); refreshSymbol(true); }
+function selectSymbol(symbol) { state.symbol = symbol; state.selected = null; state.explain = null; state.openVote = null; $("symbol").value = symbol; renderWatchlist(); renderTop(); refreshSymbol(true); }
 
 async function loadBook() {
   if (!state.symbol) return;
@@ -345,197 +334,141 @@ async function loadSignals() {
   const data = await api(`/api/signals?symbol=${state.symbol}`);
   markers = data.markers; state.signals = data.decisions;
   drawMarkers();
-  if (state.panel === "signals") renderPanel();
+  renderPanel();
 }
 
 // Bottom panel
-document.querySelector(".bottom-tabs").addEventListener("click", e => {
-  const b = e.target.closest("button"); if (!b) return;
-  state.panel = b.dataset.panel;
-  document.querySelectorAll(".bottom-tabs button").forEach(x => x.classList.toggle("on", x === b));
-  renderPanel();
-  refreshPanel();
-});
 function refreshPanel() {
-  const loader = { explain: loadExplain, risk: loadRisk, score: loadScore }[state.panel];
-  if (loader) loader().catch(() => {});
+  loadExplain().catch(() => {});
+  loadRisk().catch(() => {});
 }
 function renderPanel() {
   const panel = $("panel");
-  if (state.panel === "explain") { panel.innerHTML = renderExplain(); return; }
-  if (state.panel === "risk") { panel.innerHTML = renderRisk(); return; }
-  if (state.panel === "score") { panel.innerHTML = renderScore(); return; }
-  if (state.panel === "prices") {
-    const rows = (state.markets?.symbols || []).map(s => { const t = state.markets.tickers[s] || {};
-      return `<tr><td class="ltr">${esc(s)}</td><td>${price(t.last)}</td><td class="${t.change_24h >= 0 ? "up" : "down"}">${pct(t.change_24h)}</td><td>${price(t.high_24h)}</td><td>${price(t.low_24h)}</td><td>${FA.format((t.volume_tmn || 0) / 1e9)} میلیارد</td></tr>`; }).join("");
-    panel.innerHTML = `<table><thead><tr><th>بازار</th><th>آخرین قیمت</th><th>تغییر ۲۴ساعته</th><th>بیشینه</th><th>کمینه</th><th>حجم تومانی</th></tr></thead><tbody>${rows}</tbody></table>`;
-  } else if (state.panel === "log") {
-    const log = state.engine?.running?.log || "موتوری در حال اجرا نیست.";
-    panel.innerHTML = `<pre class="ltr" style="margin:0;padding:10px 12px;font-size:12px;white-space:pre-wrap">${esc(log)}</pre>`;
-  } else {
-    if (!state.signals.length) { panel.innerHTML = `<p class="muted" style="padding:10px 12px">هنوز تصمیم سایه یا لایو برای این بازار ثبت نشده است.</p>`; return; }
-    panel.innerHTML = `<table><thead><tr><th>زمان</th><th>حالت</th><th>نتیجه</th><th>رژیم AI</th><th>دلیل</th></tr></thead><tbody>${state.signals.map((d, i) => {
-      const cls = d.outcome === "filled" ? "up" : d.action && d.action !== "SKIP" ? "down" : "muted";
-      const open = state.open.has(d.created_at);
-      return `<tr class="clickable" data-i="${i}"><td>${STAMP.format(new Date(d.created_at))}</td><td><span class="badge">${MODE[d.mode] || esc(d.mode)}</span></td><td class="${cls}">${OUTCOME[d.outcome] || esc(d.outcome)}</td><td>${esc(d.ai_regime)}</td><td class="reason">${esc(d.reason_fa)}</td></tr>` +
-        (open ? `<tr class="detail"><td colspan="5">قواعد: ${esc(d.signal_reason)}<br>رژیم AI: ${esc(d.ai_regime_reason)}<br>بازبینی AI: ${esc(d.ai_review_reason)}<br><button class="primary" data-explain="${esc(d.created_at)}" style="margin-top:6px">تحلیل کامل این تصمیم</button></td></tr>` : "");
-    }).join("")}</tbody></table>`;
-  }
+  const keep = panel.scrollTop;
+  panel.innerHTML = renderSignal();
+  panel.scrollTop = keep;
 }
-$("panel").addEventListener("click", e => {
-  const explainButton = e.target.closest("[data-explain]");
-  if (explainButton) {
-    state.selected = explainButton.dataset.explain; state.explain = null; state.panel = "explain";
-    document.querySelectorAll(".bottom-tabs button").forEach(x => x.classList.toggle("on", x.dataset.panel === "explain"));
-    renderPanel(); return refreshPanel();
-  }
-  const row = e.target.closest("tr.clickable"); if (!row) return;
-  const key = state.signals[row.dataset.i].created_at;
-  state.open.has(key) ? state.open.delete(key) : state.open.add(key);
-  renderPanel();
-});
 
 
-// Explainability, risk and scorecard panels
-const FAMILY = { common: "شرط عمومی", trend: "روند", mean_reversion: "بازگشت به میانگین" };
+// Signal section: one story per decision — direction votes, verdict, why, risk
+const FAMILY = { common: "شرط عمومی", trend: "روند", mean_reversion: "بازگشت به میانگین", confluence: "هم‌جهتی" };
 const HELP = {
   spread: "فاصله بهترین قیمت خرید و فروش؛ اگر زیاد باشد خود ورود گران است.",
-  ema_cross: "میانگین کوتاه‌مدت (EMA ۹) تازه از بلندمدت (EMA ۲۱) بالا زده و هنوز بالاست؛ نشانه شروع روند.",
-  hourly_trend: "روند تایم‌فریم یک‌ساعته هم باید صعودی باشد تا خلاف جهت بازار نخریم.",
+  ema_cross: "EMA ۹ تازه از EMA ۲۱ بالا زده و هنوز بالاست؛ نشانه شروع روند.",
+  hourly_trend: "روند یک‌ساعته هم باید صعودی باشد تا خلاف جهت بازار نخریم.",
   above_hourly: "قیمت باید بالای میانگین ۵۰ ساعته باشد.",
-  volume: "حجم بالاتر از میانگین ۲۰ کندل یعنی حرکت پشتوانه خریدار دارد.",
-  edge_trend: "سود هدف باید بعد از کسر کارمزد، لغزش و اسپرد، با ضریب اطمینان هنوز مثبت باشد.",
+  volume: "حجم بالاتر از میانگین یعنی حرکت پشتوانه دارد.",
+  edge_trend: "سود هدف باید بعد از کارمزد، لغزش و اسپرد، با ضریب اطمینان مثبت بماند.",
   ranging: "بازگشت به میانگین فقط در بازار بدون روند معنی دارد.",
-  bollinger_reentry: "قیمت زیر باند پایین بولینگر رفته و دوباره به داخل باند برگشته است.",
-  rsi_oversold: "RSI زیر ۳۰ یعنی فروش بیش از حد و احتمال برگشت.",
-  volatility: "در نوسان شدید، خرید برای بازگشت به میانگین خطرناک است.",
-  edge_mean_reversion: "فاصله تا میانگین بولینگر باید از کل هزینه‌ها بیشتر باشد.",
+  bollinger_reentry: "قیمت زیر باند پایین رفته و دوباره به داخل برگشته است.",
+  rsi_oversold: "RSI زیر ۳۰ یعنی فروش بیش از حد.",
+  volatility: "در نوسان شدید خرید برای بازگشت به میانگین خطرناک است.",
+  edge_mean_reversion: "فاصله تا میانگین باید از کل هزینه‌ها بیشتر باشد.",
 };
+const ARROW = { up: "▲", down: "▼", flat: "●", blocked: "✕" };
+const DIR_FA = { up: "صعودی", down: "نزولی", flat: "خنثی", blocked: "مسدود" };
 function checkValue(c, v) {
   if (v == null) return c.key === "ema_cross" ? "EMA ۹ زیر EMA ۲۱ است" : "—";
   if (c.unit === "bps") return `${FA2.format(v)} واحد پایه`;
   if (c.unit === "%") return `${FA2.format(v)}٪`;
-  if (c.unit === "bars") return v >= 10000 ? "نامشخص (قدیمی)" : `${FA.format(v)} کندل`;
+  if (c.unit === "bars") return v >= 10000 ? "نامشخص" : `${FA.format(v)} کندل`;
   return Math.abs(v) >= 100 ? price(v) : FA2.format(v);
 }
 const yes = ok => ok ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
-const dots = (passed, total) => `<span class="dots" aria-label="${FA.format(passed)} از ${FA.format(total)}">${"●".repeat(passed)}<i>${"●".repeat(total - passed)}</i></span>`;
 async function loadExplain() {
   const at = state.selected ? `&at=${encodeURIComponent(state.selected)}` : "";
   state.explain = await api(`/api/explain?symbol=${state.symbol}${at}`);
-  if (state.panel === "explain") renderPanel();
+  renderPanel();
 }
 async function loadRisk() {
   state.risk = await api(`/api/risk?mode=${state.mode === "backtest" ? "shadow" : state.mode}`);
-  if (state.panel === "risk") renderPanel();
-}
-async function loadScore() {
-  state.score = await api(`/api/scorecard?mode=${state.mode === "backtest" ? "shadow" : state.mode}`);
-  if (state.panel === "score") renderPanel();
+  renderPanel();
 }
 function timeline() {
   const items = [...state.signals].reverse().slice(-48);
   if (!items.length) return "";
   const current = state.explain?.decision?.created_at;
-  return `<div class="timeline" role="list" aria-label="تصمیم‌های اخیر">${items.map(d => {
+  return `<div class="timeline" aria-label="تصمیم‌های اخیر">${items.map(d => {
     const kind = d.outcome === "filled" ? "in" : d.action && d.action !== "SKIP" ? "veto" : "skip";
     const on = current && new Date(d.created_at).getTime() === new Date(current).getTime();
-    return `<button class="tick ${kind} ${on ? "on" : ""}" role="listitem" data-pick="${esc(d.created_at)}" title="${STAMP.format(new Date(d.created_at))} · ${esc(d.reason_fa)}" aria-label="${STAMP.format(new Date(d.created_at))}"></button>`;
-  }).join("")}</div><div class="legend-row muted small"><span><i class="sw in"></i>ورود</span><span><i class="sw veto"></i>سیگنال ردشده</span><span><i class="sw skip"></i>بدون سیگنال</span></div>`;
+    return `<button class="tick ${kind} ${on ? "on" : ""}" data-pick="${esc(d.created_at)}" title="${STAMP.format(new Date(d.created_at))} · ${esc(d.reason_fa)}" aria-label="${STAMP.format(new Date(d.created_at))}"></button>`;
+  }).join("")}</div>`;
 }
-function renderExplain() {
+function story(x) {
+  const votes = x.votes, n = votes.length, c = x.consensus, r = x.rules, d = x.decision;
+  const names = dir => votes.filter(v => v.direction === dir).map(v => v.label_fa).join("، ");
+  const reg = x.ai?.regime || {}, rev = x.ai?.review || {};
+  const spread = r.checks.find(k => k.key === "spread");
+  const why = [];
+  let headline, tone;
+  if (d.outcome === "filled" && r.logged_action === "EXIT") { headline = "فروش و خروج از موقعیت"; tone = "bad"; }
+  else if (d.outcome === "filled") { headline = `خرید انجام شد · ${FAMILY[r.strategy] || ""}`; tone = "good"; }
+  else if (c.down === 0 && c.up >= n - 1) { headline = "هم‌جهت صعودی ← خرید نکرد"; tone = "warn"; }
+  else if (c.up === 0 && c.down >= n - 1) { headline = "هم‌جهت نزولی ← خرید نمی‌کند"; tone = "bad";
+    why.push("بازار نقدی است؛ در روند نزولی فقط کنار می‌ایستد و موقعیت باز را می‌بندد."); }
+  else { headline = "هم‌جهت نیستند ← صبر"; tone = "flat"; }
+  if (d.outcome !== "filled") {
+    why.unshift(`${FA.format(c.up)} صعودی، ${FA.format(c.down)} نزولی، ${FA.format(c.flat)} خنثی.` +
+      (c.up && c.down ? ` مخالف: ${c.up >= c.down ? names("down") : names("up")}.` : ""));
+    if (spread && !spread.passed) why.push(`اسپرد ${checkValue(spread, spread.value)} از سقف ${checkValue(spread, spread.threshold)} بیشتر است.`);
+    const edge = r.checks.find(k => k.key === "edge_trend");
+    if (edge && !edge.passed && c.down === 0) why.push("سود مورد انتظار بعد از کارمزد کافی نیست.");
+    if (reg.allow_entries === false || rev.approve === false) why.push("هوش مصنوعی ورود را مسدود کرد.");
+  }
+  return { headline, tone, why: why.join(" ") };
+}
+function renderSignal() {
   const x = state.explain;
   if (!x) return `<p class="pad muted">در حال بارگیری…</p>`;
-  if (!x.decision) return `<div class="pad">${timeline()}<p class="muted">برای این بازار تصمیمی با اندیکاتورهای ثبت‌شده پیدا نشد.</p></div>`;
-  const d = x.decision, r = x.rules, ai = x.ai || {}, risk = x.risk || {};
-  const families = ["trend", "mean_reversion"];
+  if (!x.decision) return `<div class="pad">${timeline()}<p class="muted">برای این بازار هنوز تصمیمی ثبت نشده است.</p></div>`;
+  const s = story(x), d = x.decision, r = x.rules, reg = x.ai?.regime || {}, rev = x.ai?.review || {};
+  const chips = [...x.votes.map(v => ({ key: v.key, label: v.label_fa, dir: v.direction, detail: v.detail_fa })),
+    { key: "ai", label: "هوش مصنوعی", dir: reg.allow_entries === false || rev.approve === false ? "blocked" : x.ai_direction, detail: `${reg.regime || "—"} · ${reg.reason_fa || ""}` }]
+    .map(v => `<button class="vote ${v.dir} ${state.openVote === v.key ? "open" : ""}" data-vote="${v.key}" title="${esc(v.detail)}"><span>${esc(v.label)}</span><b>${ARROW[v.dir]} ${DIR_FA[v.dir]}</b></button>`).join("");
+  const openVote = [...x.votes, { key: "ai", detail_fa: `${reg.regime || "—"}: ${reg.reason_fa || ""}` }].find(v => v.key === state.openVote);
+  const risk = state.risk;
+  const killLimit = risk?.limits?.find(l => l.key === "kill_switch");
+  const pnl = risk?.pnl?.total_tmn ?? 0;
+  const pos = risk?.positions?.[0];
+  const pills = risk && risk.run_id ? `<div class="pills">
+      <span>سود/زیان <b class="${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "+" : ""}${price(pnl)}</b> تومان</span>
+      <span>افت <b>${FA2.format((killLimit?.used || 0) * 100)}٪</b> از سقف ${FA.format((killLimit?.limit || 0.1) * 100)}٪</span>
+      <span>${pos ? `موقعیت باز <b class="ltr">${esc(pos.symbol)}</b> · حد ضرر ${price(pos.stop_price)}` : "موقعیت باز: ندارد"}</span>
+      <span>${risk.kill_switch ? '<b class="down">توقف اضطراری فعال</b>' : `ریسک هر معامله ${FA2.format(risk.per_trade.risk_per_trade * 100)}٪`}</span></div>` : "";
+  const families = Object.keys(r.total);
   const closest = families.reduce((a, b) => r.failed[a] <= r.failed[b] ? a : b);
-  const family = state.family && families.includes(state.family) ? state.family : closest;
-  const spread = r.checks.find(c => c.key === "spread");
-  const entered = r.action === "ENTER_LONG";
-  const head = entered
-    ? `<span class="verdict good">سیگنال ورود · ${FAMILY[r.strategy] || ""}</span>`
-    : `<span class="verdict bad">ورود نکرد</span><span class="muted">نزدیک‌ترین: ${FAMILY[closest]} ${dots(r.total[closest] - r.failed[closest], r.total[closest])}</span>`;
-  const tabs = families.map(f => `<button class="seg ${f === family ? "on" : ""}" data-family="${f}">${FAMILY[f]} ${dots(r.total[f] - r.failed[f], r.total[f])}</button>`).join("");
-  const rows = [spread, ...r.checks.filter(c => c.family === family)].map(c => {
+  const family = families.includes(state.family) ? state.family : closest;
+  const segs = families.map(f => `<button class="seg ${f === family ? "on" : ""}" data-family="${f}">${FAMILY[f]} · ${FA.format(r.total[f] - r.failed[f])}/${FA.format(r.total[f])}</button>`).join("");
+  const rows = [r.checks.find(c => c.key === "spread"), ...r.checks.filter(c => c.family === family)].map(c => {
     const open = state.openCheck === c.key;
-    return `<button class="crow ${c.passed ? "" : "fail"} ${open ? "open" : ""}" data-check="${c.key}" aria-expanded="${open}">${yes(c.passed)}<span class="grow">${esc(c.label_fa)}</span><span class="chev">${open ? "−" : "+"}</span></button>` +
-      (open ? `<div class="cdetail"><div><span class="muted">مقدار:</span> <b>${checkValue(c, c.value)}</b> <span class="muted">· آستانه:</span> <b>${checkValue(c, c.threshold)}</b></div><p>${HELP[c.key] || ""}</p></div>` : "");
+    return `<button class="crow ${c.passed ? "" : "fail"}" data-check="${c.key}" aria-expanded="${open}">${yes(c.passed)}<span class="grow">${esc(c.label_fa)}</span><span class="muted small">${checkValue(c, c.value)}</span></button>` +
+      (open ? `<div class="cdetail">آستانه: <b>${checkValue(c, c.threshold)}</b><p>${HELP[c.key] || ""}</p></div>` : "");
   }).join("");
-  const reg = ai.regime || {}, rev = ai.review || {};
-  const aiOk = reg.allow_entries !== false && rev.approve !== false;
-  const f = x.features || {};
-  return `<div class="pad">${timeline()}
-    <div class="xhead"><b>${STAMP.format(new Date(d.created_at))}</b><span class="badge">${MODE[d.mode] || esc(d.mode)}</span>${head}</div>
-    <div class="segs">${tabs}</div>
-    <div class="checks">${rows}</div>
-    <details class="fold"><summary>${yes(aiOk)} هوش مصنوعی: <b>${esc(reg.regime)}</b> <span class="muted">· اطمینان ${FA.format(Math.round(Number(reg.confidence ?? 0) * 100))}٪ · ضریب حجم ×${FA2.format(Number(reg.size_multiplier ?? 0))}</span></summary>
-      <p>${esc(reg.reason_fa)}</p><p class="muted">بازبینی سیگنال: ${rev.approve === false ? "رد" : "تأیید"} — ${esc(rev.reason_fa)}</p></details>
-    <details class="fold"><summary>${yes(!!risk.approved)} مدیریت ریسک: ${risk.approved ? `مجاز · ${price(Number(risk.notional_tmn))} تومان` : `${FA.format((risk.constraints || []).length)} محدودیت`}</summary>
-      <ul class="list">${(risk.constraints || []).map(c => `<li>${esc(c)}</li>`).join("") || "<li>همه سقف‌ها رعایت شد.</li>"}</ul></details>
-    <details class="fold"><summary>اندیکاتورهای خام</summary><div class="kv">
-      <span>قیمت</span><b>${price(Number(f.close))}</b><span>RSI ۱۴</span><b>${FA2.format(Number(f.rsi_14 ?? 0))}</b>
-      <span>ATR ۱۴</span><b>${price(Number(f.atr_14))}</b><span>VWAP</span><b>${price(Number(f.vwap))}</b>
-      <span>عدم‌تعادل دفتر</span><b>${FA2.format(Number(f.orderbook_imbalance_5 ?? 0))}</b><span>اسپرد</span><b>${FA2.format(Number(f.spread_bps ?? 0))} واحد پایه</b></div></details>
+  const log = (state.engine?.running?.log || "").split("\n").slice(-6).join("\n");
+  return `<div class="pad sig">${timeline()}
+    <div class="story ${s.tone}"><span class="when">${STAMP.format(new Date(d.created_at))} · ${MODE[d.mode] || esc(d.mode)}</span>
+      <b class="headline">${s.headline}</b><p>${esc(s.why)}</p></div>
+    <div class="votes">${chips}</div>
+    ${openVote ? `<p class="vote-detail">${esc(openVote.detail_fa)}</p>` : ""}
+    ${pills}
+    <details class="fold" ${state.detailsOpen ? "open" : ""}><summary>جزئیات قواعد، AI، ریسک و گزارش موتور</summary>
+      <div class="segs">${segs}</div><div class="checks">${rows}</div>
+      <p><b>رژیم AI:</b> ${esc(reg.reason_fa)}</p><p class="muted"><b>بازبینی AI:</b> ${esc(rev.reason_fa)}</p>
+      <p class="muted"><b>ریسک:</b> ${esc((x.risk?.constraints || []).join(" · ") || "همه سقف‌ها رعایت شد.")}</p>
+      ${log ? `<pre class="ltr log">${esc(log)}</pre>` : ""}</details>
   </div>`;
-}
-function renderRisk() {
-  const r = state.risk;
-  if (!r) return `<p class="pad muted">در حال بارگیری…</p>`;
-  if (!r.run_id) return `<p class="pad muted">هنوز اجرای «${MODE[r.mode] || r.mode}» در پایگاه‌داده ثبت نشده است.</p>`;
-  const p = r.pnl, t = r.per_trade;
-  const money = v => `<b class="${v >= 0 ? "up" : "down"}">${v >= 0 ? "+" : ""}${price(v)}</b>`;
-  const bars = r.limits.map(l => {
-    const ratio = l.floor ? (l.used > 0 ? Math.min(1, l.limit / l.used) : 1) : Math.min(1, Math.max(0, l.used / l.limit));
-    const value = l.key === "positions" ? `${FA.format(l.used)}/${FA.format(l.limit)}` : `${FA2.format(l.used * 100)}٪ از ${FA2.format(l.limit * 100)}٪`;
-    const cls = l.breached ? "bad" : ratio > 0.7 ? "warn" : "good";
-    return `<div class="limit" title="${esc(l.label_fa)}"><div class="row"><span>${esc(l.label_fa)}</span><span class="${l.breached ? "down" : "muted"}">${value}</span></div><div class="bar"><i class="${cls}" style="width:${Math.max(2, Math.round(ratio * 100))}%"></i></div></div>`;
-  }).join("");
-  const positions = r.positions.length ? `<table><thead><tr><th>بازار</th><th>ورود</th><th>حد ضرر</th><th>هدف</th><th>سود/زیان</th></tr></thead><tbody>${r.positions.map(x => `<tr><td class="ltr">${esc(x.symbol)}</td><td>${price(x.entry)}</td><td class="down">${price(x.stop_price)}</td><td class="up">${price(x.target_price)}</td><td class="${(x.unrealized_tmn ?? 0) >= 0 ? "up" : "down"}">${price(x.unrealized_tmn)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted small">موقعیت بازی نیست؛ کل سرمایه تومانی است.</p>`;
-  return `<div class="pad"><div class="hero">
-      <div><span>سود/زیان کل (تومان)</span>${money(p.total_tmn)}</div>
-      <div><span>محقق‌شده</span>${money(p.realized_tmn)}</div>
-      <div><span>باز</span>${money(p.unrealized_tmn)}</div>
-      <div><span>توقف اضطراری</span><b class="${r.kill_switch ? "down" : "up"}">${r.kill_switch ? "فعال" : "غیرفعال"}</b></div></div>
-    <div class="x-grid"><div class="card">${bars}</div><div class="card">${positions}</div></div>
-    <details class="fold"><summary>قواعد هر معامله ${r.canary ? '<span class="badge">canary</span>' : ""}</summary><div class="kv">
-      <span>ریسک هر معامله</span><b>${FA2.format(t.risk_per_trade * 100)}٪ سرمایه</b>
-      <span>سقف هر بازار</span><b>${FA2.format(t.max_symbol_exposure * 100)}٪ سرمایه</b>
-      <span>حد ضرر</span><b>${FA2.format(t.stop_atr)} × ATR</b>
-      <span>هدف سود</span><b>${FA2.format(t.target_r)} × ریسک</b>
-      <span>خروج زمانی</span><b>${FA.format(t.time_stop_bars)} کندل</b>
-      <span>استراحت بعد از معامله / ضرر</span><b>${FA.format(t.cooldown_minutes)} / ${FA.format(t.loss_cooldown_minutes)} دقیقه</b></div></details></div>`;
-}
-function renderScore() {
-  const s = state.score;
-  if (!s) return `<p class="pad muted">در حال بارگیری…</p>`;
-  if (!s.run_id) return `<p class="pad muted">هنوز اجرای «${MODE[s.mode] || s.mode}» در پایگاه‌داده ثبت نشده است.</p>`;
-  const sec = v => v == null ? "—" : `${FA2.format(v)} ثانیه`;
-  const ret = (s.return || 0) * 100;
-  const item = (label, value, rubric) => `<div class="metric" title="${rubric}"><span>${label}</span><b>${value}</b></div>`;
-  return `<div class="pad"><div class="hero">
-      <div title="درصد سود نهایی · ۹۰ امتیاز"><span>بازده خالص</span><b class="${ret >= 0 ? "up" : "down"}">${FA2.format(ret)}٪</b></div>
-      <div title="کنترل ضرر · ۳۰ امتیاز"><span>بیشترین افت</span><b>${FA2.format((s.max_drawdown || 0) * 100)}٪</b></div>
-      <div title="فعال بودن الگوریتم · ۱۵ امتیاز"><span>معاملات</span><b>${FA.format(s.fills || 0)}</b></div>
-      <div title="استفاده واقعی از AI · ۳۵ امتیاز"><span>رد توسط AI</span><b>${FA.format(s.ai_vetoes || 0)}</b></div></div>
-    <details class="fold"><summary>همه شاخص‌های داوری · <span class="muted ltr">${esc(s.run_id)}</span> · ${FA2.format(s.hours || 0)} ساعت</summary><div class="cards">
-      ${item("رفت‌وبرگشت کامل", FA.format(s.round_trips || 0), "Number of trades")}
-      ${item("حجم معاملات", `${price(s.volume_tmn || 0)} تومان`, "Trading volume")}
-      ${item("میانگین هر معامله", `${price(s.avg_trade_tmn || 0)} تومان`, "Average trade volume")}
-      ${item("کارمزد پرداختی", `${price(s.fees_tmn || 0)} تومان`, "در بازده خالص لحاظ شده")}
-      ${item("سرعت اجرا (میانه)", sec(s.latency_median_s), "از ثبت سفارش تا پر شدن")}
-      ${item("خطاهای اجرا", FA.format(s.errors || 0), "پایداری اجرا · ۱۵ امتیاز")}
-      ${item("تصمیم / سیگنال", `${FA.format(s.decisions || 0)} / ${FA.format(s.signals || 0)}`, "لاگ تصمیم")}
-      ${item("تماس‌های AI", `${FA.format(s.ai_calls || 0)} · جایگزین ${FA.format(s.ai_fallbacks || 0)}`, "پایداری AI")}</div></details></div>`;
 }
 document.addEventListener("click", e => {
   const pick = e.target.closest("[data-pick]");
   if (pick) { state.selected = pick.dataset.pick; state.openCheck = null; loadExplain().catch(() => {}); return; }
+  const vote = e.target.closest("[data-vote]");
+  if (vote) { state.openVote = state.openVote === vote.dataset.vote ? null : vote.dataset.vote; renderPanel(); return; }
   const fam = e.target.closest("[data-family]");
   if (fam) { state.family = fam.dataset.family; state.openCheck = null; renderPanel(); return; }
   const check = e.target.closest("[data-check]");
   if (check) { state.openCheck = state.openCheck === check.dataset.check ? null : check.dataset.check; renderPanel(); }
 });
+document.addEventListener("toggle", e => { if (e.target.matches?.(".sig .fold")) state.detailsOpen = e.target.open; }, true);
 
 // Engine and modes
 document.querySelector(".mode-tabs").addEventListener("click", e => {
@@ -592,7 +525,6 @@ async function loadEngine() {
     <span>مدل AI</span><b class="ltr">${esc(e.ai.model)}</b>
     <span>زمان باقی‌مانده</span><b>${left == null ? "—" : FA2.format(left) + " ساعت"}</b>`;
   renderModes();
-  if (state.panel === "log") renderPanel();
 }
 
 // Settings

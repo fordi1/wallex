@@ -29,6 +29,8 @@ strategy:
   time_stop_bars: 12
   # 3 and 5 added trades but lowered out-of-sample return: reports/sweep_cross.json
   cross_window_bars: 1
+  # Buying when all indicators agree lost money out of sample: reports/sweep_confluence.json
+  confluence_enabled: false
 
 risk:
   risk_per_trade: "0.01"

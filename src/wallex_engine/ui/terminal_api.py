@@ -210,7 +210,9 @@ def create_terminal_app(
         if record is None or not record.get("features"):
             return {"decision": None}
         snapshot = FeatureSnapshot.model_validate(record["features"])
-        result = HybridStrategy(config().strategy).explain(snapshot)
+        strategy = HybridStrategy(config().strategy)
+        result = strategy.explain(snapshot)
+        votes = strategy.votes(snapshot)
         families = ("trend", "mean_reversion")
         risk = record.get("risk") or {}
         return {
@@ -227,6 +229,10 @@ def create_terminal_app(
                 "logged_action": (record.get("signal") or {}).get("action"),
             },
             "ai": {"regime": record.get("regime"), "review": record.get("review")},
+            "votes": [v.__dict__ for v in votes],
+            "consensus": {d: sum(v.direction == d for v in votes) for d in ("up", "down", "flat")},
+            "ai_direction": regime_direction((record.get("regime") or {}).get("regime")),
+            "confluence_enabled": config().strategy.confluence_enabled,
             "risk": {
                 "approved": risk.get("approved"),
                 "reason_fa": risk.get("reason_fa"),
@@ -347,6 +353,16 @@ def create_terminal_app(
         return get_settings()
 
     return app
+
+
+def regime_direction(regime: str | None) -> str:
+    """The AI's free-text regime label reduced to up/down/flat."""
+    text_ = (regime or "").lower()
+    if "bull" in text_ or "صعود" in text_:
+        return "up"
+    if "bear" in text_ or "نزول" in text_:
+        return "down"
+    return "flat"
 
 
 def base_resolution(tf: int) -> int:

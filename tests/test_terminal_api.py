@@ -137,6 +137,10 @@ def test_explain_rebuilds_checklist_ai_and_risk_for_a_logged_decision(setup, tmp
     assert body["rules"]["failed"]["trend"] == 0
     assert body["ai"]["regime"]["allow_entries"] is False
     assert body["risk"]["constraints"] == ["بررسی رژیم رد کرد."]
+    votes = {v["key"]: v["direction"] for v in body["votes"]}
+    assert set(votes) == {"ema", "hourly", "vwap", "rsi", "bollinger", "orderbook"}
+    assert body["ai_direction"] == "flat"
+    assert sum(body["consensus"].values()) == 6
 
 
 def test_risk_and_scorecard_answer_without_a_database(setup) -> None:

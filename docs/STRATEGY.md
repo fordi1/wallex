@@ -142,6 +142,22 @@ Later entries after the cross added trades but each one paid the full cost
 for less of the move, so the window stays at 1. Low frequency is the
 consequence of a ~0.55% round-trip cost, not a missing signal.
 
+### Indicator agreement (confluence) as an entry rule
+
+Six indicators each vote bullish, bearish or neutral (EMA 9/21, hourly trend,
+VWAP, RSI, Bollinger middle, order-book imbalance). The tested rule entered
+when no vote was bearish and at least five were bullish, and exited when the
+mirror held (`reports/sweep_confluence.json`):
+
+| Confluence | In-sample | Out-of-sample | Trades | Max drawdown |
+|---|---|---|---|---|
+| **off** (kept) | +0.005% | **+0.045%** | 3 | 0.07% |
+| on | -0.010% | -0.269% | 11 | 0.32% |
+
+When every indicator already agrees, most of the move has happened, so the
+rule bought late and paid fees on more trades. The votes stay in the terminal
+as an at-a-glance explanation; the entry rule stays off.
+
 ### AI on vs off (BTCTMN, live BoxAPI model, 15m)
 
 Source: `reports/bt-BTCTMN-20261022T194935Z-e15822.md` and its `-ai-off` twin.

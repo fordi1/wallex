@@ -27,6 +27,7 @@ class SignalAction(StrEnum):
 class StrategyFamily(StrEnum):
     TREND = "trend"
     MEAN_REVERSION = "mean_reversion"
+    CONFLUENCE = "confluence"
     NONE = "none"
 
 

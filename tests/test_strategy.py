@@ -59,10 +59,12 @@ def test_explain_lists_every_condition_with_pass_or_fail(config, feature) -> Non
     volume_z=st.decimals("-2", "2", places=2),
     cross_age=st.one_of(st.none(), st.integers(0, 8)),
     window=st.integers(1, 5),
+    confluence=st.booleans(),
+    imbalance=st.decimals("-0.5", "0.5", places=2),
 )
 def test_explain_verdict_always_matches_evaluate(
     config, feature, close, ema_9, previous_ema_9, hourly_ema_20, previous_close,
-    previous_rsi, atr, spread, volume_z, cross_age, window,
+    previous_rsi, atr, spread, volume_z, cross_age, window, confluence, imbalance,
 ) -> None:
     snapshot = feature.model_copy(
         update={
@@ -70,9 +72,14 @@ def test_explain_verdict_always_matches_evaluate(
             "hourly_ema_20": hourly_ema_20, "previous_close": previous_close,
             "previous_rsi_14": previous_rsi, "atr_14": atr, "spread_bps": spread,
             "volume_zscore_20": volume_z, "ema_cross_age": cross_age,
+            "orderbook_imbalance_5": imbalance,
         }
     )
-    strategy = HybridStrategy(config.strategy.model_copy(update={"cross_window_bars": window}))
+    strategy = HybridStrategy(
+        config.strategy.model_copy(
+            update={"cross_window_bars": window, "confluence_enabled": confluence}
+        )
+    )
     signal = strategy.evaluate(snapshot)
     explanation = strategy.explain(snapshot)
     assert (explanation.action, explanation.strategy) == (signal.action, signal.strategy)
@@ -126,3 +133,42 @@ def test_indicator_frame_keeps_bars_where_ema_9_is_below(feature) -> None:
     below = frame[frame["ema_9"] <= frame["ema_21"]]
     assert len(below) > 20
     assert below["ema_cross_age"].isna().all()
+
+
+def test_votes_give_each_indicator_a_direction(config, feature) -> None:
+    strategy = HybridStrategy(config.strategy)
+    votes = {v.key: v.direction for v in strategy.votes(feature)}
+    assert set(votes) == {"ema", "hourly", "vwap", "rsi", "bollinger", "orderbook"}
+    assert votes["ema"] == "up" and votes["hourly"] == "up" and votes["vwap"] == "up"
+    bearish = feature.model_copy(
+        update={"ema_9": Decimal("97"), "hourly_ema_20": Decimal("94"), "close": Decimal("93"),
+                "rsi_14": Decimal("35"), "orderbook_imbalance_5": Decimal("-0.4")}
+    )
+    assert all(v.direction == "down" for v in strategy.votes(bearish))
+
+
+def test_confluence_enters_when_all_bullish_and_exits_when_all_bearish(config, feature) -> None:
+    from wallex_engine.models import Position
+
+    aligned = feature.model_copy(
+        update={"previous_ema_9": Decimal("99"), "previous_ema_21": Decimal("98.4"),
+                "ema_cross_age": 4, "rsi_14": Decimal("60")}
+    )
+    off = HybridStrategy(config.strategy)
+    on = HybridStrategy(config.strategy.model_copy(update={"confluence_enabled": True}))
+    assert off.evaluate(aligned).action == SignalAction.SKIP
+    entry = on.evaluate(aligned)
+    assert entry.action == SignalAction.ENTER_LONG and entry.strategy.value == "confluence"
+    # One neutral vote (a balanced order book) still counts as aligned; one bearish does not.
+    neutral_book = aligned.model_copy(update={"orderbook_imbalance_5": Decimal("0")})
+    assert on.evaluate(neutral_book).action == SignalAction.ENTER_LONG
+    bearish_book = aligned.model_copy(update={"orderbook_imbalance_5": Decimal("-0.3")})
+    assert on.evaluate(bearish_book).action == SignalAction.SKIP
+    bearish = aligned.model_copy(
+        update={"ema_9": Decimal("97"), "hourly_ema_20": Decimal("94"), "close": Decimal("93"),
+                "rsi_14": Decimal("35"), "orderbook_imbalance_5": Decimal("-0.4")}
+    )
+    position = Position(symbol="BTCTMN", quantity=Decimal("1"), average_entry=Decimal("99"),
+                        stop_price=Decimal("80"), target_price=Decimal("130"))
+    assert on.evaluate_exit(bearish, position).action == SignalAction.EXIT
+    assert off.evaluate_exit(bearish, position).action == SignalAction.SKIP

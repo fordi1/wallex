@@ -27,6 +27,14 @@ class Check:
 
 
 @dataclass(frozen=True)
+class Vote:
+    key: str
+    label_fa: str
+    direction: str  # "up", "down" or "flat"
+    detail_fa: str
+
+
+@dataclass(frozen=True)
 class Explanation:
     checks: tuple[Check, ...]
     action: SignalAction
@@ -34,6 +42,15 @@ class Explanation:
 
     def failed(self, family: str) -> int:
         return sum(1 for check in self.checks if check.family == family and not check.passed)
+
+
+def aligned(votes: tuple[Vote, ...], direction: str) -> bool:
+    """No vote against ``direction`` and at most one neutral vote."""
+    opposite = "down" if direction == "up" else "up"
+    return (
+        not any(v.direction == opposite for v in votes)
+        and sum(v.direction == direction for v in votes) >= len(votes) - 1
+    )
 
 
 class HybridStrategy:
@@ -96,7 +113,64 @@ class HybridStrategy:
                     expected_move_bps=expected_bps,
                     reason_fa="بازگشت قیمت به باند بولینگر در بازار خنثی تأیید شد.",
                 )
+        if self._confluence_entry(snapshot):
+            stop = snapshot.close - self.config.stop_atr * snapshot.atr_14
+            target = snapshot.close + self.config.trend_target_r * (snapshot.close - stop)
+            return TradeSignal(
+                decision_id=decision_id,
+                symbol=snapshot.symbol,
+                created_at=snapshot.observed_at,
+                action=SignalAction.ENTER_LONG,
+                strategy=StrategyFamily.CONFLUENCE,
+                entry_price=snapshot.close,
+                stop_price=stop,
+                target_price=target,
+                expected_move_bps=(target - snapshot.close) / snapshot.close * Decimal("10000"),
+                reason_fa="همه اندیکاتورها هم‌جهت صعودی شدند و سود پس از هزینه کافی است.",
+            )
         return self._skip(decision_id, snapshot, "شرایط ورود کامل نیست.")
+
+    def votes(self, snapshot: FeatureSnapshot) -> tuple[Vote, ...]:
+        """Direction of each indicator on its own: bullish, bearish or neutral."""
+        s = snapshot
+
+        def side(value: Decimal, up: Decimal = Decimal("0"), down: Decimal | None = None) -> str:
+            down = -up if down is None else down
+            return "up" if value > up else "down" if value < down else "flat"
+
+        return (
+            Vote("ema", "EMA ۹/۲۱", side(s.ema_9 - s.ema_21),
+                 "EMA ۹ بالای EMA ۲۱" if s.ema_9 > s.ema_21 else "EMA ۹ زیر EMA ۲۱"),
+            Vote("hourly", "روند ساعتی", side(s.hourly_ema_20 - s.hourly_ema_50),
+                 "EMA ۲۰ ساعتی بالای EMA ۵۰" if s.hourly_ema_20 > s.hourly_ema_50
+                 else "EMA ۲۰ ساعتی زیر EMA ۵۰"),
+            Vote("vwap", "VWAP", side(s.close - s.vwap),
+                 "قیمت بالای میانگین وزنی حجم" if s.close > s.vwap
+                 else "قیمت زیر میانگین وزنی حجم"),
+            Vote("rsi", "RSI", side(s.rsi_14, Decimal("55"), Decimal("45")),
+                 "بالای ۵۵: قدرت خریدار" if s.rsi_14 > 55
+                 else "زیر ۴۵: قدرت فروشنده" if s.rsi_14 < 45 else "بین ۴۵ و ۵۵: بی‌طرف"),
+            Vote("bollinger", "بولینگر", side(s.close - s.bollinger_mid),
+                 "قیمت بالای میانه باند" if s.close > s.bollinger_mid
+                 else "قیمت زیر میانه باند"),
+            Vote("orderbook", "دفتر سفارش", side(s.orderbook_imbalance_5, Decimal("0.1")),
+                 "خریدار بیشتر از فروشنده" if s.orderbook_imbalance_5 > Decimal("0.1")
+                 else "فروشنده بیشتر از خریدار" if s.orderbook_imbalance_5 < Decimal("-0.1")
+                 else "خرید و فروش متعادل"),
+        )
+
+    def _confluence_entry(self, snapshot: FeatureSnapshot) -> bool:
+        if not self.config.confluence_enabled:
+            return False
+        stop = snapshot.close - self.config.stop_atr * snapshot.atr_14
+        target = snapshot.close + self.config.trend_target_r * (snapshot.close - stop)
+        expected_bps = (target - snapshot.close) / snapshot.close * Decimal("10000")
+        return (
+            snapshot.spread_bps <= self.config.max_spread_bps
+            and aligned(self.votes(snapshot), "up")
+            and snapshot.volume_zscore_20 > self.config.volume_z_min
+            and self._edge_is_sufficient(snapshot, expected_bps)
+        )
 
     def explain(self, snapshot: FeatureSnapshot) -> Explanation:
         """Every entry condition with its measured value; mirrors ``evaluate`` exactly."""
@@ -141,6 +215,23 @@ class HybridStrategy:
                   s.bollinger_mid > s.close and mr_bps > cost_bps,
                   float(mr_bps), float(cost_bps), "bps"),
         )
+        if cfg.confluence_enabled:
+            votes = self.votes(s)
+            bullish = sum(v.direction == "up" for v in votes)
+            checks += tuple(
+                Check("confluence", f"vote_{v.key}", f"{v.label_fa} نزولی نیست",
+                      v.direction != "down")
+                for v in votes
+            ) + (
+                Check("confluence", "bullish_count", "دست‌کم همه به‌جز یکی صعودی",
+                      bullish >= len(votes) - 1, float(bullish), float(len(votes) - 1)),
+                Check("confluence", "volume_confluence", "تأیید حجم (z-score)",
+                      s.volume_zscore_20 > cfg.volume_z_min,
+                      float(s.volume_zscore_20), float(cfg.volume_z_min)),
+                Check("confluence", "edge_confluence",
+                      "حرکت مورد انتظار بیش از هزینه × ضریب اطمینان",
+                      trend_bps > cost_bps, float(trend_bps), float(cost_bps), "bps"),
+            )
         families = {c.family for c in checks if c.family != "common"}
         passed = {f: all(c.passed for c in checks if c.family == f) for f in families}
         if not spread_ok:
@@ -149,6 +240,8 @@ class HybridStrategy:
             verdict = (SignalAction.ENTER_LONG, StrategyFamily.TREND)
         elif passed["mean_reversion"]:
             verdict = (SignalAction.ENTER_LONG, StrategyFamily.MEAN_REVERSION)
+        elif passed.get("confluence"):
+            verdict = (SignalAction.ENTER_LONG, StrategyFamily.CONFLUENCE)
         else:
             verdict = (SignalAction.SKIP, StrategyFamily.NONE)
         return Explanation(checks, *verdict)
@@ -163,6 +256,8 @@ class HybridStrategy:
             reason = "حد ضرر دنبال‌کننده فعال شد."
         elif position.target_price is not None and snapshot.close >= position.target_price:
             reason = "هدف سود محقق شد."
+        elif self.config.confluence_enabled and aligned(self.votes(snapshot), "down"):
+            reason = "همه اندیکاتورها هم‌جهت نزولی شدند."
         elif position.bars_held >= self.config.time_stop_bars:
             reason = "مهلت نگهداری موقعیت پایان یافت."
         else:

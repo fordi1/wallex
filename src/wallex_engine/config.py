@@ -53,6 +53,8 @@ class StrategySection(BaseModel):
     time_stop_bars: int = 12
     # Entry is allowed while the EMA 9/21 cross is younger than this many bars (1 = same bar).
     cross_window_bars: int = Field(default=1, ge=1)
+    # Enter when every indicator vote is bullish; exit when every vote turns bearish.
+    confluence_enabled: bool = False
 
 
 class RiskSection(BaseModel):
