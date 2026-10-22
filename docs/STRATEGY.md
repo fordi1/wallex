@@ -205,6 +205,25 @@ Honest reading:
 - USDTTMN was rejected by the data-quality gate (a 10-hour hole in Wallex
   candle history on 2026-10-19), which is the intended fail-closed behaviour.
 
+### Live-safety fixes after the readiness audit (2026-10-23)
+
+Each fix has a regression test; `reports/sweep_parity.json` shows the backtest
+is unchanged after moving trailing-stop logic into a shared function.
+
+| Audit finding | Fix |
+|---|---|
+| Shadow crashed on a Wallex `RemoteProtocolError` | Reads retry every transport error; the loop pauses with backoff and reports degraded health. Reconciliation drift still stops the engine. |
+| Order writes could be resent after a timeout | Writes are never retried blindly; the broker reconciles by client ID. |
+| `/v1/account/trades` raised `KeyError` | Parses the documented `AccountLatestTrades` list, `isBuyer` side and a stable content-derived fill id. |
+| `bars_held` / trailing stop never updated live | `_manage_position` advances bars and uses `trail_position()`, shared with the backtest. |
+| Stop exits were limit orders | Stop and trailing-stop exits are urgent and go at market, even inside the minimum hold. |
+| Canary limit could be broken across symbols | Positions and cash are re-read before each market in a cycle. |
+| Cancel/fill race | Orders are re-read after every cancel; partial fills become protected positions and nothing is re-bought or double-sold. |
+
+Still open from the audit: a 24-hour continuous shadow run, PostgreSQL
+leader lock for live (SQLite has none; the terminal allows one engine process),
+restoring cooldown/peak state after restart, and Telegram alerts.
+
 ## 7. Re-running (for judges)
 
 ```powershell
