@@ -227,7 +227,17 @@ class TradingRuntime:
                 / self.risk.state.day_start_equity,
             )
         )
+        await self._consider_markets(equity, fee_rate)
+
+    async def _consider_markets(self, equity: Decimal, fee_rate: Decimal) -> None:
+        """Evaluate each market against fresh positions and cash.
+
+        An entry filled for one symbol must count against the canary/portfolio limits
+        of the next symbol in the same cycle.
+        """
         for symbol, market in self._markets.items():
+            positions = await self.store.load_positions()
+            cash = await self._cash_tmn()
             try:
                 await self._consider_symbol(symbol, market, positions, equity, cash, fee_rate)
             except StaleMarketDataError:

@@ -154,3 +154,28 @@ async def test_stop_exits_go_at_market_even_inside_min_hold(config, feature) -> 
     await runtime._manage_position(target, feature.model_copy(update={"close": Decimal("131")}),
                                    _candle("131", "131"), None)
     assert runtime.exits[-1] == (1, False)
+
+
+@pytest.mark.asyncio
+async def test_each_market_sees_positions_opened_earlier_in_the_same_cycle(config) -> None:
+    from wallex_engine.runtime.engine import TradingRuntime
+
+    runtime = object.__new__(TradingRuntime)
+    runtime._markets = {"BTCTMN": object(), "ETHTMN": object()}
+    opened: list = []
+    seen: list = []
+
+    class Store:
+        async def load_positions(self):
+            return list(opened)
+
+    async def cash():
+        return Decimal("5000000") - Decimal("250000") * len(opened)
+
+    async def consider(symbol, market, positions, equity, cash_now, fee_rate):
+        seen.append((symbol, len(positions), cash_now))
+        opened.append(_open_position(symbol=symbol))
+
+    runtime.store, runtime._cash_tmn, runtime._consider_symbol = Store(), cash, consider
+    await runtime._consider_markets(Decimal("5000000"), Decimal("0.0025"))
+    assert seen == [("BTCTMN", 0, Decimal("5000000")), ("ETHTMN", 1, Decimal("4750000"))]
