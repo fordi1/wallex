@@ -38,19 +38,28 @@ def run_scorecard(
     card: dict[str, Any] = {"run_id": run_id, "mode": mode}
     if run_id is None:
         return card
+    window = connection.execute(
+        text("SELECT MIN(captured_at), MAX(captured_at) FROM equity_snapshots WHERE run_id = :run"),
+        {"run": run_id},
+    ).first()
     fills = pd.read_sql(
         text(
             "SELECT f.side, f.quantity, f.price, f.fee_tmn, f.filled_at, f.client_id, "
-            "i.created_at AS intended_at FROM fills f "
-            "JOIN order_intents i ON i.client_id = f.client_id "
-            "JOIN decisions d ON d.decision_id = i.decision_id AND d.run_id = :run"
+            "i.created_at AS intended_at, d.run_id FROM fills f "
+            "LEFT JOIN order_intents i ON i.client_id = f.client_id "
+            "LEFT JOIN decisions d ON d.decision_id = i.decision_id"
         ),
         connection,
-        params={"run": run_id},
     )
+    # Wallex trade history has no order id; those fills belong to the run by time window.
+    filled_at = pd.to_datetime(fills["filled_at"])
+    orphan = fills["run_id"].isna() & filled_at.between(
+        pd.to_datetime(window[0]), pd.to_datetime(window[1])
+    )
+    fills = fills[(fills["run_id"] == run_id) | orphan]
     notional = pd.to_numeric(fills["quantity"]) * pd.to_numeric(fills["price"])
     latencies = []
-    for _, group in fills.groupby("client_id"):
+    for _, group in fills.dropna(subset=["intended_at"]).groupby("client_id"):
         first_fill = pd.to_datetime(group["filled_at"]).min()
         intended = pd.to_datetime(group["intended_at"]).min()
         latencies.append((first_fill - intended).total_seconds())

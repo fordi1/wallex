@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import random
 from collections.abc import AsyncIterator, Mapping, Sequence
@@ -294,7 +295,10 @@ class WallexClient:
         params = {"symbol": symbol.upper()} if symbol else None
         payload = await self._request("GET", "/v1/account/trades", private=True, params=params)
         raw = _unwrap(payload, "result")
-        items = raw.get("trades", raw) if isinstance(raw, dict) else raw
+        if isinstance(raw, dict):
+            items = raw.get("AccountLatestTrades", raw.get("trades", []))
+        else:
+            items = raw
         return [_parse_fill(item) for item in items or []]
 
     async def create_order(self, intent: OrderIntent) -> OrderRecord:
@@ -491,17 +495,28 @@ def _parse_order(raw: Mapping[str, Any], fallback: OrderIntent | None = None) ->
 
 
 def _parse_fill(raw: Mapping[str, Any]) -> Fill:
+    # Wallex account trades carry no trade or order id and report the side as isBuyer.
+    symbol = str(_first(raw, "symbol")).upper()
+    if "isBuyer" in raw and "side" not in raw:
+        side = Side.BUY if str(raw["isBuyer"]).lower() in {"true", "1"} else Side.SELL
+    else:
+        side = Side(str(_first(raw, "side")).upper())
+    timestamp = _first(raw, "timestamp", "createdAt")
+    fill_id = _first(raw, "id", "tradeId", default=None)
+    if fill_id is None:
+        identity = f"{symbol}|{timestamp}|{raw.get('price')}|{raw.get('quantity')}|{side.value}"
+        fill_id = "wx-" + hashlib.sha256(identity.encode()).hexdigest()[:32]
     return Fill(
-        fill_id=str(_first(raw, "id", "tradeId")),
+        fill_id=str(fill_id),
         client_id=str(_first(raw, "clientOrderId", "client_id", default="")),
-        symbol=str(_first(raw, "symbol")).upper(),
-        side=Side(str(_first(raw, "side")).upper()),
+        symbol=symbol,
+        side=side,
         quantity=_decimal(_first(raw, "quantity", "qty")),
         price=_decimal(_first(raw, "price")),
         fee_quantity=_decimal(_first(raw, "fee", "commission", default=0)),
         fee_asset=str(_first(raw, "feeAsset", "commissionAsset", default="TMN")).upper(),
         fee_tmn=_decimal(_first(raw, "feeTmn", default=0)),
-        filled_at=_parse_datetime(_first(raw, "timestamp", "createdAt")),
+        filled_at=_parse_datetime(timestamp),
     )
 
 

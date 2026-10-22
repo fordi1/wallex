@@ -28,6 +28,9 @@ def _db(tmp_path):
             ("f2", "c2", "BTCTMN", "SELL", "0.01", "101000000", "3030",
              "2026-10-23 10:00:04", "{}"),
             ("f9", "c9", "BTCTMN", "BUY", "1", "100000000", "1", "2026-10-23 08:00:01", "{}"),
+            # Real Wallex trades carry no client id: attributed by the run's time window.
+            ("wx-1", "", "BTCTMN", "BUY", "0.001", "100000000", "250", "2026-10-23 09:40:00", "{}"),
+            ("wx-2", "", "BTCTMN", "BUY", "0.001", "100000000", "250", "2026-10-22 23:00:00", "{}"),
         ],
     }
     with engine.begin() as connection:
@@ -62,10 +65,9 @@ def test_scorecard_counts_only_the_selected_run(tmp_path) -> None:
     with engine.connect() as connection:
         card = run_scorecard(connection, "live", 5_000_000, tmp_path)
     assert card["run_id"] == "live-1"
-    assert card["fills"] == 2 and card["round_trips"] == 1
-    assert card["volume_tmn"] == 2_010_000
-    assert card["avg_trade_tmn"] == 1_005_000
-    assert card["fees_tmn"] == 5_530
+    assert card["fills"] == 3 and card["round_trips"] == 1
+    assert card["volume_tmn"] == 2_110_000
+    assert card["fees_tmn"] == 5_780
     assert card["latency_median_s"] == 3
     assert round(card["return"], 6) == round(5_004_470 / 5_000_000 - 1, 6)
     assert round(card["max_drawdown"], 4) == 0.002

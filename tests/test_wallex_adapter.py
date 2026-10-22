@@ -189,3 +189,36 @@ async def test_order_writes_are_never_blindly_retried(monkeypatch) -> None:
 
 async def _no_sleep(*_args, **_kwargs) -> None:
     return None
+
+
+@pytest.mark.asyncio
+async def test_fills_parse_the_documented_account_trades_shape(monkeypatch) -> None:
+    # Example from the official Wallex docs for GET /v1/account/trades.
+    trade = {
+        "symbol": "PAXGTMN", "quantity": "0.0032340000000000",
+        "price": "61133333.0000000000000000", "sum": "197705.1989220000000000",
+        "fee": "0.0000097020000000", "feeCoefficient": "0.0030000000000000",
+        "feeAsset": "PAXG", "isBuyer": True, "timestamp": "2022-06-18T17:22:25Z",
+    }
+    sell = {**trade, "isBuyer": False, "timestamp": "2022-06-18T18:00:00Z"}
+    client = await _client_returning(
+        monkeypatch, {"result": {"AccountLatestTrades": [trade, sell]}, "success": True}
+    )
+    try:
+        fills = await client.get_fills()
+        again = await client.get_fills()
+    finally:
+        await client.close()
+    assert [f.side.value for f in fills] == ["BUY", "SELL"]
+    assert fills[0].quantity == Decimal("0.003234") and fills[0].fee_asset == "PAXG"
+    assert fills[0].fill_id != fills[1].fill_id
+    assert [f.fill_id for f in fills] == [f.fill_id for f in again]
+
+
+@pytest.mark.asyncio
+async def test_empty_account_trades_is_an_empty_list(monkeypatch) -> None:
+    client = await _client_returning(monkeypatch, {"result": {"AccountLatestTrades": []}})
+    try:
+        assert await client.get_fills() == []
+    finally:
+        await client.close()
