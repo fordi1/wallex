@@ -25,8 +25,18 @@ from sqlalchemy import create_engine, text
 
 from ..config import load_config
 from ..exchange.wallex_client import WallexClient
-from ..reporting.results import decision_frame, trade_markers
-from ..runtime.control import MODES, EngineController, preflight, read_env_file, tail
+from ..models import FeatureSnapshot
+from ..reporting.results import decision_frame, find_decision, trade_markers
+from ..reporting.scorecard import risk_state, run_scorecard
+from ..runtime.control import (
+    MODES,
+    EngineController,
+    mode_database_url,
+    preflight,
+    read_env_file,
+    tail,
+)
+from ..strategy.hybrid import HybridStrategy
 
 TIMEFRAMES = (1, 5, 15, 60, 240, 1440)
 PAGE = Path(__file__).resolve().parents[3] / "web" / "terminal.html"
@@ -96,6 +106,25 @@ def create_terminal_app(
             return []
 
     guard = [Depends(authorize)]
+
+    def mode_engine(mode: str):
+        """Read-only connection to the database the engine uses for ``mode``."""
+        url = mode_database_url(mode, env()).replace("+aiosqlite", "")
+        url = url.replace("+asyncpg", "+psycopg")
+        if url.startswith("sqlite:///./"):
+            path = root / url.removeprefix("sqlite:///./")
+            if not path.exists():
+                return None
+            url = f"sqlite:///{path}"
+        return create_engine(url)
+
+    async def last_prices() -> dict[str, float]:
+        try:
+            async with wallex() as client:
+                tickers = await client.get_tickers(config().challenge.allowed_markets)
+        except httpx.HTTPError:
+            return {}
+        return {symbol: float(t["last"]) for symbol, t in tickers.items()}
 
     @app.api_route("/", methods=["GET", "HEAD"], dependencies=guard)
     def page() -> FileResponse:
@@ -170,6 +199,84 @@ def create_terminal_app(
                 for row in latest.to_dict(orient="records")
             ],
         }
+
+    @app.get("/api/explain", dependencies=guard)
+    def explain(symbol: str, at: str | None = None, mode: str | None = None) -> dict[str, Any]:
+        path = root / config().app.logs_dir / "decisions.jsonl"
+        modes = {mode} if mode else {"live", "shadow"}
+        record = find_decision(path, symbol, at, modes)
+        if record is None and not mode and not at:
+            record = find_decision(path, symbol, None, {"backtest"})
+        if record is None or not record.get("features"):
+            return {"decision": None}
+        snapshot = FeatureSnapshot.model_validate(record["features"])
+        result = HybridStrategy(config().strategy).explain(snapshot)
+        families = ("trend", "mean_reversion")
+        risk = record.get("risk") or {}
+        return {
+            "decision": {k: record.get(k) for k in ("created_at", "mode", "run_id", "outcome",
+                                                     "reason_fa")},
+            "features": {k: record["features"].get(k) for k in (
+                "close", "rsi_14", "atr_14", "vwap", "orderbook_imbalance_5", "spread_bps")},
+            "rules": {
+                "action": result.action.value,
+                "strategy": result.strategy.value,
+                "failed": {f: result.failed(f) for f in families},
+                "total": {f: sum(c.family == f for c in result.checks) for f in families},
+                "checks": [c.__dict__ for c in result.checks],
+                "logged_action": (record.get("signal") or {}).get("action"),
+            },
+            "ai": {"regime": record.get("regime"), "review": record.get("review")},
+            "risk": {
+                "approved": risk.get("approved"),
+                "reason_fa": risk.get("reason_fa"),
+                "constraints": list(risk.get("constraints") or []),
+                "quantity": risk.get("quantity"),
+                "notional_tmn": risk.get("notional_tmn"),
+                "risk_tmn": risk.get("risk_tmn"),
+            },
+        }
+
+    @app.get("/api/risk", dependencies=guard)
+    async def risk(mode: str = Query("live")) -> dict[str, Any]:
+        engine = mode_engine(mode)
+        if engine is None:
+            return {"run_id": None, "mode": mode}
+        prices = await last_prices()
+        try:
+            with engine.connect() as connection:
+                return risk_state(connection, config(), mode, prices)
+        except Exception:  # noqa: BLE001 - an empty or foreign database has no run yet
+            return {"run_id": None, "mode": mode}
+
+    @app.get("/api/scorecard", dependencies=guard)
+    def scorecard(mode: str = Query("live")) -> dict[str, Any]:
+        engine = mode_engine(mode)
+        if engine is None:
+            return {"run_id": None, "mode": mode}
+        cfg = config()
+        try:
+            with engine.connect() as connection:
+                card = run_scorecard(
+                    connection, mode, float(cfg.challenge.initial_capital_tmn),
+                    root / cfg.app.logs_dir,
+                )
+                ai = connection.execute(text(
+                    "SELECT COUNT(*), COALESCE(SUM(fallback), 0), COALESCE(SUM(cache_hit), 0) "
+                    "FROM ai_calls"
+                )).first()
+        except Exception:  # noqa: BLE001 - an empty or foreign database has no run yet
+            return {"run_id": None, "mode": mode}
+        frame = decisions()
+        if card.get("run_id") and not frame.empty:
+            run = frame[frame["run_id"] == card["run_id"]]
+            signals = run[run["action"].fillna("SKIP") != "SKIP"]
+            card["signals"] = len(signals)
+            card["ai_vetoes"] = int(
+                ((signals["ai_approve"] == False) | (signals["ai_allow"] == False)).sum()  # noqa: E712
+            )
+        card["ai_calls"], card["ai_fallbacks"], card["ai_cache_hits"] = (int(v) for v in ai)
+        return card
 
     @app.get("/api/engine", dependencies=guard)
     async def engine() -> dict[str, Any]:

@@ -62,6 +62,17 @@ def preflight(config: AppConfig, mode: str, env: Mapping[str, str]) -> list[str]
     return reasons
 
 
+def mode_database_url(mode: str, env: Mapping[str, str]) -> str:
+    """Separate SQLite file per mode, so shadow positions never leak into live state."""
+    explicit = env.get(f"DATABASE_URL_{mode.upper()}")
+    if explicit:
+        return explicit
+    shared = env.get("DATABASE_URL", "")
+    if shared and not shared.startswith("sqlite"):
+        return shared  # a server database is provisioned per deployment
+    return f"sqlite+aiosqlite:///./data/{mode}.db"
+
+
 def default_command(mode: str) -> list[str]:
     root = Path(__file__).resolve().parents[3]
     return [sys.executable, str(root / "main.py"), mode, "--config", "config.yaml"]
@@ -102,7 +113,12 @@ class EngineController:
             child = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
                 self.command(mode),
                 cwd=self.cwd,
-                env={**os.environ, **env, "PYTHONUNBUFFERED": "1"},
+                env={
+                    **os.environ,
+                    **env,
+                    "DATABASE_URL": mode_database_url(mode, env),
+                    "PYTHONUNBUFFERED": "1",
+                },
                 stdout=log,
                 stderr=subprocess.STDOUT,
                 creationflags=flags,

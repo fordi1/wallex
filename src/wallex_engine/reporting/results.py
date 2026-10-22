@@ -55,6 +55,26 @@ def decision_frame(path: Path) -> pd.DataFrame:
     return frame
 
 
+def find_decision(
+    path: Path, symbol: str, at: str | None = None, modes: set[str] | None = None
+) -> dict | None:
+    """Full logged decision (features included): the one at ``at``, else the latest."""
+    if not path.exists():
+        return None
+    wanted = pd.Timestamp(at) if at else None
+    found = None
+    with path.open(encoding="utf-8") as handle:
+        for line in handle:
+            if f'"{symbol}"' not in line:
+                continue
+            record = json.loads(line)
+            if record.get("symbol") != symbol or (modes and record.get("mode") not in modes):
+                continue
+            if wanted is None or pd.Timestamp(record["created_at"]) == wanted:
+                found = record
+    return found
+
+
 def decision_summary(frame: pd.DataFrame) -> dict[str, int]:
     """Counts for the judging story: how many rule signals the AI vetoed."""
     if frame.empty:

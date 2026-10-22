@@ -109,3 +109,37 @@ def test_candles_are_aggregated_from_base_resolution() -> None:
     first, last = bars.iloc[0], bars.iloc[1]
     assert (first["open"], first["high"], first["close"], first["volume"]) == (0, 15, 14.5, 15.0)
     assert (last["open"], last["close"], last["volume"]) == (15, 19.5, 5.0)
+
+
+def test_explain_rebuilds_checklist_ai_and_risk_for_a_logged_decision(setup, tmp_path, feature):
+    import json
+
+    client, _, _ = setup
+    record = {
+        "decision_id": "d1", "run_id": "shadow-1", "created_at": "2026-10-22T00:00:00Z",
+        "mode": "shadow", "symbol": "BTCTMN", "outcome": "skipped", "reason_fa": "رد",
+        "features": feature.model_dump(mode="json"),
+        "signal": {"action": "ENTER_LONG"},
+        "regime": {"regime": "trend", "allow_entries": False, "size_multiplier": "0",
+                   "confidence": "0.8", "reason_fa": "روند نزولی"},
+        "review": {"approve": False, "size_adjustment": "0", "reason_fa": "کارمزد بالاست"},
+        "risk": {"approved": False, "reason_fa": "رد", "constraints": ["بررسی رژیم رد کرد."]},
+    }
+    (tmp_path / "logs").mkdir()
+    (tmp_path / "logs" / "decisions.jsonl").write_text(
+        json.dumps(record, ensure_ascii=False), encoding="utf-8"
+    )
+    body = client.get("/api/explain?symbol=BTCTMN").json()
+    assert body["decision"]["mode"] == "shadow"
+    assert body["rules"]["action"] == "ENTER_LONG"
+    keys = {c["key"] for c in body["rules"]["checks"]}
+    assert keys >= {"ema_cross", "edge_trend", "rsi_oversold"}
+    assert body["rules"]["failed"]["trend"] == 0
+    assert body["ai"]["regime"]["allow_entries"] is False
+    assert body["risk"]["constraints"] == ["بررسی رژیم رد کرد."]
+
+
+def test_risk_and_scorecard_answer_without_a_database(setup) -> None:
+    client, _, _ = setup
+    assert client.get("/api/risk?mode=live").json()["run_id"] is None
+    assert client.get("/api/scorecard?mode=live").json()["run_id"] is None

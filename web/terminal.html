@@ -73,8 +73,26 @@
   .kv b { font-weight: 500; text-align: left; }
 
   .bottom { grid-area: bottom; border-top: 1px solid var(--border); background: var(--panel);
-    display: flex; flex-direction: column; height: 260px; min-width: 0; }
-  .bottom-tabs { display: flex; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+    display: flex; flex-direction: column; height: 360px; min-width: 0; }
+  .bottom-tabs { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+  .pad { padding: 10px 12px; } .small { font-size: 12px; } .grow { flex: 1; min-width: 0; }
+  .xhead { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .chip { padding: 2px 10px; border-radius: 12px; font-size: 12px; border: 1px solid var(--border); }
+  .chip.bad { color: var(--down); border-color: rgba(242,54,69,.5); } .chip.good { color: var(--up); border-color: rgba(8,153,129,.5); }
+  .x-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; margin: 10px 0; }
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; min-width: 0; }
+  .card h4, .pad > h4 { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  .check { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; flex-wrap: wrap; }
+  .ok { color: var(--up); font-weight: 700; } .no { color: var(--down); font-weight: 700; }
+  .note { margin: 0 0 6px 0; padding-right: 22px; color: var(--muted); font-size: 12px; }
+  .list { margin: 6px 0 0; padding-right: 18px; color: var(--muted); font-size: 12px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+  .metric { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+  .metric span { color: var(--muted); font-size: 12px; } .metric small { color: var(--muted); font-size: 11px; }
+  .limit { margin-bottom: 8px; font-size: 13px; }
+  .bar { height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; } .bar i.good { background: var(--up); } .bar i.warn { background: var(--warn); } .bar i.bad { background: var(--down); }
   .bottom-tabs button.on { border-color: var(--accent); color: #fff; }
   .table-wrap { overflow: auto; flex: 1; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -108,7 +126,7 @@
     .price-big { font-size: 17px; }
     .mode-tabs { flex: 1 1 100%; }
     .mode-tab { flex: 1 1 0; justify-content: center; padding: 0 6px; }
-    .bottom { height: 320px; }
+    .bottom { height: 460px; }
   }
 </style>
 </head>
@@ -154,6 +172,9 @@
   <section class="bottom">
     <div class="bottom-tabs" role="tablist">
       <button class="on" data-panel="signals">سیگنال‌ها</button>
+      <button data-panel="explain">تحلیل سیگنال</button>
+      <button data-panel="risk">ریسک و سود/زیان</button>
+      <button data-panel="score">معیارهای داوری</button>
       <button data-panel="prices">قیمت‌ها</button>
       <button data-panel="log">گزارش موتور</button>
     </div>
@@ -202,7 +223,7 @@ const pct = v => v == null ? "—" : `${v > 0 ? "+" : ""}${FA2.format(v)}٪`;
 const esc = s => String(s ?? "—").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const $ = id => document.getElementById(id);
 
-const state = { symbol: null, tf: 15, ema: true, vol: true, mode: "shadow", engine: null, markets: null, panel: "signals", signals: [], open: new Set() };
+const state = { symbol: null, tf: 15, ema: true, vol: true, mode: "shadow", engine: null, markets: null, panel: "signals", signals: [], open: new Set(), selected: null, explain: null, risk: null, score: null };
 
 async function api(path, options = {}) {
   const response = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
@@ -287,7 +308,7 @@ function renderWatchlist() {
 $("watchlist").addEventListener("click", e => { const row = e.target.closest("[data-symbol]"); if (row) selectSymbol(row.dataset.symbol); });
 $("watchlist").addEventListener("keydown", e => { const row = e.target.closest("[data-symbol]"); if (row && e.key === "Enter") selectSymbol(row.dataset.symbol); });
 $("symbol").addEventListener("change", e => selectSymbol(e.target.value));
-function selectSymbol(symbol) { state.symbol = symbol; $("symbol").value = symbol; renderWatchlist(); renderTop(); refreshSymbol(true); }
+function selectSymbol(symbol) { state.symbol = symbol; state.selected = null; state.explain = null; $("symbol").value = symbol; renderWatchlist(); renderTop(); refreshSymbol(true); }
 
 async function loadBook() {
   if (!state.symbol) return;
@@ -314,9 +335,17 @@ document.querySelector(".bottom-tabs").addEventListener("click", e => {
   state.panel = b.dataset.panel;
   document.querySelectorAll(".bottom-tabs button").forEach(x => x.classList.toggle("on", x === b));
   renderPanel();
+  refreshPanel();
 });
+function refreshPanel() {
+  const loader = { explain: loadExplain, risk: loadRisk, score: loadScore }[state.panel];
+  if (loader) loader().catch(() => {});
+}
 function renderPanel() {
   const panel = $("panel");
+  if (state.panel === "explain") { panel.innerHTML = renderExplain(); return; }
+  if (state.panel === "risk") { panel.innerHTML = renderRisk(); return; }
+  if (state.panel === "score") { panel.innerHTML = renderScore(); return; }
   if (state.panel === "prices") {
     const rows = (state.markets?.symbols || []).map(s => { const t = state.markets.tickers[s] || {};
       return `<tr><td class="ltr">${esc(s)}</td><td>${price(t.last)}</td><td class="${t.change_24h >= 0 ? "up" : "down"}">${pct(t.change_24h)}</td><td>${price(t.high_24h)}</td><td>${price(t.low_24h)}</td><td>${FA.format((t.volume_tmn || 0) / 1e9)} میلیارد</td></tr>`; }).join("");
@@ -330,21 +359,130 @@ function renderPanel() {
       const cls = d.outcome === "filled" ? "up" : d.action && d.action !== "SKIP" ? "down" : "muted";
       const open = state.open.has(d.created_at);
       return `<tr class="clickable" data-i="${i}"><td>${STAMP.format(new Date(d.created_at))}</td><td><span class="badge">${MODE[d.mode] || esc(d.mode)}</span></td><td class="${cls}">${OUTCOME[d.outcome] || esc(d.outcome)}</td><td>${esc(d.ai_regime)}</td><td class="reason">${esc(d.reason_fa)}</td></tr>` +
-        (open ? `<tr class="detail"><td colspan="5">قواعد: ${esc(d.signal_reason)}<br>رژیم AI: ${esc(d.ai_regime_reason)}<br>بازبینی AI: ${esc(d.ai_review_reason)}</td></tr>` : "");
+        (open ? `<tr class="detail"><td colspan="5">قواعد: ${esc(d.signal_reason)}<br>رژیم AI: ${esc(d.ai_regime_reason)}<br>بازبینی AI: ${esc(d.ai_review_reason)}<br><button class="primary" data-explain="${esc(d.created_at)}" style="margin-top:6px">تحلیل کامل این تصمیم</button></td></tr>` : "");
     }).join("")}</tbody></table>`;
   }
 }
 $("panel").addEventListener("click", e => {
+  const explainButton = e.target.closest("[data-explain]");
+  if (explainButton) {
+    state.selected = explainButton.dataset.explain; state.explain = null; state.panel = "explain";
+    document.querySelectorAll(".bottom-tabs button").forEach(x => x.classList.toggle("on", x.dataset.panel === "explain"));
+    renderPanel(); return refreshPanel();
+  }
   const row = e.target.closest("tr.clickable"); if (!row) return;
   const key = state.signals[row.dataset.i].created_at;
   state.open.has(key) ? state.open.delete(key) : state.open.add(key);
   renderPanel();
 });
 
+
+// Explainability, risk and scorecard panels
+const FAMILY = { common: "شرط عمومی", trend: "روند (Trend)", mean_reversion: "بازگشت به میانگین (Mean reversion)" };
+function checkValue(c, v) {
+  if (v == null) return "—";
+  if (c.unit === "bps") return `${FA2.format(v)} واحد پایه`;
+  if (c.unit === "%") return `${FA2.format(v)}٪`;
+  return Math.abs(v) >= 100 ? price(v) : FA2.format(v);
+}
+const yes = ok => ok ? '<span class="ok">✓</span>' : '<span class="no">✗</span>';
+async function loadExplain() {
+  const at = state.selected ? `&at=${encodeURIComponent(state.selected)}` : "";
+  state.explain = await api(`/api/explain?symbol=${state.symbol}${at}`);
+  if (state.panel === "explain") renderPanel();
+}
+async function loadRisk() {
+  state.risk = await api(`/api/risk?mode=${state.mode === "backtest" ? "shadow" : state.mode}`);
+  if (state.panel === "risk") renderPanel();
+}
+async function loadScore() {
+  state.score = await api(`/api/scorecard?mode=${state.mode === "backtest" ? "shadow" : state.mode}`);
+  if (state.panel === "score") renderPanel();
+}
+function renderExplain() {
+  const x = state.explain;
+  if (!x) return `<p class="pad muted">در حال بارگیری…</p>`;
+  if (!x.decision) return `<p class="pad muted">برای این بازار تصمیمی با اندیکاتورهای ثبت‌شده پیدا نشد.</p>`;
+  const d = x.decision, r = x.rules, ai = x.ai || {}, risk = x.risk || {};
+  const verdict = r.action === "ENTER_LONG" ? `<span class="up">سیگنال ورود (${r.strategy === "trend" ? "روند" : "بازگشت به میانگین"})</span>` : `<span class="down">بدون سیگنال ورود</span>`;
+  const summary = ["trend", "mean_reversion"].map(f =>
+    `<span class="chip ${r.failed[f] ? "bad" : "good"}">${FAMILY[f].split(" (")[0]}: ${FA.format(r.failed[f])} از ${FA.format(r.total[f])} شرط منفی</span>`).join("");
+  const groups = ["common", "trend", "mean_reversion"].map(f => `<div class="card"><h4>${FAMILY[f]}</h4>${
+    r.checks.filter(c => c.family === f).map(c => `<div class="check">${yes(c.passed)}<span class="grow">${esc(c.label_fa)}</span><span class="muted">${checkValue(c, c.value)}${c.threshold != null ? ` / ${checkValue(c, c.threshold)}` : ""}</span></div>`).join("")}</div>`).join("");
+  const reg = ai.regime || {}, rev = ai.review || {};
+  const aiBlock = `<div class="card"><h4>هوش مصنوعی</h4>
+    <div class="check">${yes(reg.allow_entries !== false)}<span class="grow">رژیم بازار: <b>${esc(reg.regime)}</b></span><span class="muted">اطمینان ${FA2.format(Number(reg.confidence ?? 0))} · ضریب حجم ×${FA2.format(Number(reg.size_multiplier ?? 0))}</span></div>
+    <p class="note">${esc(reg.reason_fa)}</p>
+    <div class="check">${yes(rev.approve !== false)}<span class="grow">بازبینی سیگنال</span><span class="muted">ضریب ×${FA2.format(Number(rev.size_adjustment ?? 0))}</span></div>
+    <p class="note">${esc(rev.reason_fa)}</p></div>`;
+  const riskBlock = `<div class="card"><h4>مدیریت ریسک</h4>
+    <div class="check">${yes(!!risk.approved)}<span class="grow">${risk.approved ? "سفارش در همه سقف‌ها مجاز شد" : "ورود توسط لایه ریسک مجاز نشد"}</span></div>
+    ${risk.approved ? `<div class="kv"><span>مقدار</span><b>${FA6.format(Number(risk.quantity))}</b><span>ارزش سفارش</span><b>${price(Number(risk.notional_tmn))} تومان</b><span>ریسک تا حد ضرر</span><b>${price(Number(risk.risk_tmn))} تومان</b></div>` : ""}
+    <ul class="list">${(risk.constraints || []).map(c => `<li>${esc(c)}</li>`).join("")}</ul></div>`;
+  const f = x.features || {};
+  return `<div class="pad">
+    <div class="xhead"><b>${STAMP.format(new Date(d.created_at))}</b><span class="badge">${MODE[d.mode] || esc(d.mode)}</span>
+      <span>نتیجه نهایی: <b>${OUTCOME[d.outcome] || esc(d.outcome)}</b></span><span>حکم قواعد: ${verdict}</span></div>
+    <div class="chips">${summary}</div>
+    <div class="muted small">قیمت ${price(Number(f.close))} · RSI ${FA2.format(Number(f.rsi_14 ?? 0))} · ATR ${price(Number(f.atr_14))} · VWAP ${price(Number(f.vwap))} · عدم‌تعادل دفتر ${FA2.format(Number(f.orderbook_imbalance_5 ?? 0))} · اسپرد ${FA2.format(Number(f.spread_bps ?? 0))} واحد پایه</div>
+    <div class="x-grid">${groups}${aiBlock}${riskBlock}</div>
+    <p class="muted small">شرط‌ها از اندیکاتورهای ثبت‌شده همین تصمیم با تنظیمات فعلی بازسازی شده‌اند؛ تست خودکار برابری این حکم با تصمیم واقعی استراتژی را در ۳۰۰ حالت تصادفی بررسی می‌کند.</p></div>`;
+}
+function renderRisk() {
+  const r = state.risk;
+  if (!r) return `<p class="pad muted">در حال بارگیری…</p>`;
+  if (!r.run_id) return `<p class="pad muted">هنوز اجرای «${MODE[r.mode] || r.mode}» در پایگاه‌داده ثبت نشده است.</p>`;
+  const bars = r.limits.map(l => {
+    const ratio = l.floor ? (l.used > 0 ? Math.min(1, l.limit / l.used) : 1) : Math.min(1, Math.max(0, l.used / l.limit));
+    const value = l.key === "positions" ? `${FA.format(l.used)} از ${FA.format(l.limit)}` : `${FA2.format(l.used * 100)}٪ / ${FA2.format(l.limit * 100)}٪`;
+    const cls = l.breached ? "bad" : ratio > 0.7 ? "warn" : "good";
+    return `<div class="limit"><div class="row"><span>${esc(l.label_fa)}</span><span class="${l.breached ? "down" : "muted"}">${value}</span></div><div class="bar"><i class="${cls}" style="width:${Math.round(ratio * 100)}%"></i></div></div>`;
+  }).join("");
+  const p = r.pnl, t = r.per_trade;
+  const money = v => `<b class="${v >= 0 ? "up" : "down"}">${v >= 0 ? "+" : ""}${price(v)} تومان</b>`;
+  const positions = r.positions.length ? `<table><thead><tr><th>بازار</th><th>مقدار</th><th>ورود</th><th>قیمت فعلی</th><th>حد ضرر</th><th>هدف</th><th>سود/زیان باز</th></tr></thead><tbody>${r.positions.map(x => `<tr><td class="ltr">${esc(x.symbol)}</td><td>${FA6.format(x.quantity)}</td><td>${price(x.entry)}</td><td>${price(x.last)}</td><td class="down">${price(x.stop_price)}</td><td class="up">${price(x.target_price)}</td><td class="${(x.unrealized_tmn ?? 0) >= 0 ? "up" : "down"}">${price(x.unrealized_tmn)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted">موقعیت بازی وجود ندارد؛ کل سرمایه به تومان است.</p>`;
+  return `<div class="pad"><div class="cards">
+      <div class="metric"><span>ارزش سبد</span><b>${price(r.equity_tmn)} تومان</b></div>
+      <div class="metric"><span>سود/زیان کل</span>${money(p.total_tmn)}</div>
+      <div class="metric"><span>سود/زیان محقق‌شده</span>${money(p.realized_tmn)}</div>
+      <div class="metric"><span>سود/زیان باز</span>${money(p.unrealized_tmn)}</div>
+      <div class="metric"><span>توقف اضطراری</span><b class="${r.kill_switch ? "down" : "up"}">${r.kill_switch ? "فعال" : "غیرفعال"}</b></div>
+      <div class="metric"><span>حالت حجم</span><b>${r.canary ? "canary (کوچک)" : "کامل"}</b></div></div>
+    <div class="x-grid"><div class="card"><h4>سقف‌ها و میزان مصرف</h4>${bars}</div>
+      <div class="card"><h4>قواعد هر معامله</h4><div class="kv">
+        <span>ریسک هر معامله</span><b>${FA2.format(t.risk_per_trade * 100)}٪ سرمایه</b>
+        <span>سقف هر بازار</span><b>${FA2.format(t.max_symbol_exposure * 100)}٪ سرمایه</b>
+        <span>حد ضرر</span><b>${FA2.format(t.stop_atr)} × ATR</b>
+        <span>هدف سود</span><b>${FA2.format(t.target_r)} × ریسک</b>
+        <span>خروج زمانی</span><b>${FA.format(t.time_stop_bars)} کندل</b>
+        <span>استراحت بعد از معامله / ضرر</span><b>${FA.format(t.cooldown_minutes)} / ${FA.format(t.loss_cooldown_minutes)} دقیقه</b></div></div></div>
+    <h4>موقعیت‌های باز</h4>${positions}</div>`;
+}
+function renderScore() {
+  const s = state.score;
+  if (!s) return `<p class="pad muted">در حال بارگیری…</p>`;
+  if (!s.run_id) return `<p class="pad muted">هنوز اجرای «${MODE[s.mode] || s.mode}» در پایگاه‌داده ثبت نشده است.</p>`;
+  const sec = v => v == null ? "—" : `${FA2.format(v)} ثانیه`;
+  const item = (label, value, rubric) => `<div class="metric"><span>${label}</span><b>${value}</b><small>${rubric}</small></div>`;
+  return `<div class="pad"><p class="muted small">اجرای <span class="ltr">${esc(s.run_id)}</span> · ${FA2.format(s.hours || 0)} ساعت</p><div class="cards">
+    ${item("بازده خالص", `<span class="${(s.return || 0) >= 0 ? "up" : "down"}">${FA2.format((s.return || 0) * 100)}٪</span>`, "درصد سود نهایی · ۹۰ امتیاز")}
+    ${item("بیشترین افت سرمایه", `${FA2.format((s.max_drawdown || 0) * 100)}٪`, "کنترل ضرر · ۳۰ امتیاز")}
+    ${item("تعداد معاملات", `${FA.format(s.fills || 0)} سفارش · ${FA.format(s.round_trips || 0)} رفت‌وبرگشت`, "فعال بودن الگوریتم · ۱۵ امتیاز")}
+    ${item("حجم معاملات", `${price(s.volume_tmn || 0)} تومان`, "Trading volume")}
+    ${item("میانگین حجم هر معامله", `${price(s.avg_trade_tmn || 0)} تومان`, "Average trade volume")}
+    ${item("کارمزد پرداختی", `${price(s.fees_tmn || 0)} تومان`, "در بازده خالص لحاظ شده")}
+    ${item("سرعت اجرا", `میانه ${sec(s.latency_median_s)} · بیشینه ${sec(s.latency_max_s)}`, "از ثبت سفارش تا پر شدن")}
+    ${item("خطاهای اجرا", FA.format(s.errors || 0), "پایداری اجرا · ۱۵ امتیاز")}
+    ${item("تصمیم‌ها / سیگنال‌ها", `${FA.format(s.decisions || 0)} / ${FA.format(s.signals || 0)}`, "منطق استراتژی · لاگ تصمیم")}
+    ${item("رد سیگنال توسط AI", FA.format(s.ai_vetoes || 0), "استفاده واقعی از AI · ۳۵ امتیاز")}
+    ${item("تماس‌های AI", `${FA.format(s.ai_calls || 0)} · جایگزین ${FA.format(s.ai_fallbacks || 0)} · کش ${FA.format(s.ai_cache_hits || 0)}`, "پایداری و تکرارپذیری AI")}
+  </div></div>`;
+}
+
 // Engine and modes
 document.querySelector(".mode-tabs").addEventListener("click", e => {
   const b = e.target.closest(".mode-tab"); if (!b) return;
-  state.mode = b.dataset.mode; renderModes();
+  state.mode = b.dataset.mode; renderModes(); refreshPanel();
 });
 function renderModes() {
   const engine = state.engine; if (!engine) return;
@@ -426,12 +564,13 @@ for (const [id, key] of [["t-ema", "ema"], ["t-vol", "vol"]]) {
   $(id).addEventListener("click", e => { state[key] = !state[key]; e.target.classList.toggle("on", state[key]); e.target.setAttribute("aria-pressed", state[key]); loadCandles(); });
 }
 
-function refreshSymbol(fit) { loadCandles(fit).catch(() => toast("بارگیری نمودار ناموفق بود.")); loadBook().catch(() => {}); loadSignals().catch(() => {}); }
+function refreshSymbol(fit) { refreshPanel(); loadCandles(fit).catch(() => toast("بارگیری نمودار ناموفق بود.")); loadBook().catch(() => {}); loadSignals().catch(() => {}); }
 const every = (ms, fn) => setInterval(() => fn().catch(() => {}), ms);
 (async () => {
   await Promise.all([loadMarkets(), loadEngine()]).catch(() => toast("اتصال به سرور ترمینال برقرار نشد."));
   refreshSymbol(true);
   every(10000, loadMarkets); every(5000, loadBook); every(30000, loadCandles); every(20000, loadSignals); every(5000, loadEngine);
+  setInterval(refreshPanel, 15000);
 })();
 </script>
 </body>

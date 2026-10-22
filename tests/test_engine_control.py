@@ -43,3 +43,15 @@ def test_env_file_is_parsed_without_exporting(tmp_path) -> None:
     (tmp_path / ".env").write_text("# comment\nA=1\nB = two \nEMPTY=\n", encoding="utf-8")
     assert read_env_file(tmp_path / ".env") == {"A": "1", "B": "two", "EMPTY": ""}
     assert read_env_file(tmp_path / "missing.env") == {}
+
+
+def test_each_mode_gets_its_own_sqlite_database() -> None:
+    from wallex_engine.runtime.control import mode_database_url
+
+    shared = {"DATABASE_URL": "sqlite+aiosqlite:///./data/shadow.db"}
+    assert mode_database_url("live", shared) == "sqlite+aiosqlite:///./data/live.db"
+    assert mode_database_url("shadow", {}) == "sqlite+aiosqlite:///./data/shadow.db"
+    override = {"DATABASE_URL_LIVE": "sqlite+aiosqlite:///./data/custom.db"}
+    assert mode_database_url("live", override) == "sqlite+aiosqlite:///./data/custom.db"
+    postgres = {"DATABASE_URL": "postgresql+asyncpg://db/engine"}
+    assert mode_database_url("live", postgres) == "postgresql+asyncpg://db/engine"

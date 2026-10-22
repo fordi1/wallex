@@ -191,6 +191,24 @@ The panel never places orders itself: it only runs `main.py <mode>`, so every
 trade still comes from the algorithm and has a decision-log line.
 Code: `src/wallex_engine/runtime/control.py`.
 
+### Trading terminal (`python terminal.py`)
+
+A TradingView-style page on 127.0.0.1 that makes every judging item visible:
+
+- **Signal analysis:** for any logged decision, every entry condition with its
+  measured value and threshold (EMA cross, hourly trend, volume, Bollinger
+  re-entry, RSI, volatility, spread, fee-adjusted edge), a count such as
+  "trend: 2 of 5 conditions failed", then the AI regime/review and the risk
+  constraints. `HybridStrategy.explain()` mirrors `evaluate()`; a property test
+  checks that their verdicts agree on 300 random market states.
+- **Risk and P&L:** each limit next to its current usage, per-trade rules,
+  open positions with stop/target, realized and unrealized P&L.
+- **Scorecard:** number of trades, volume, average trade size, net return,
+  max drawdown, fees, execution latency (intent to fill), errors, decisions,
+  AI vetoes and AI calls, each labelled with its rubric row.
+- Each mode writes its own SQLite file (`data/shadow.db`, `data/live.db`), so
+  simulated shadow positions can never be loaded by the live engine.
+
 ## 9. Wallex tools
 
 Market data, balances, fees and orders use the official Wallex REST API and the

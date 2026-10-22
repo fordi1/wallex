@@ -117,3 +117,18 @@ def test_equity_stats_measure_peak_to_trough_drawdown() -> None:
     assert round(stats["return"], 4) == 0.01
     assert round(stats["max_drawdown"], 4) == 0.02
     assert stats["hours"] == 3
+
+
+def test_find_decision_prefers_requested_time_then_latest(tmp_path) -> None:
+    from wallex_engine.reporting.results import find_decision
+
+    first = decision("shadow", "skipped")
+    second = decision("shadow", "filled")
+    second["created_at"] = "2026-10-22T19:45:00Z"
+    backtest = decision("backtest", "filled")
+    path = tmp_path / "decisions.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in (first, second, backtest)), encoding="utf-8")
+    assert find_decision(path, "BTCTMN", modes={"shadow"})["outcome"] == "filled"
+    at = find_decision(path, "BTCTMN", at="2026-10-22T19:30:00Z", modes={"shadow"})
+    assert at["outcome"] == "skipped"
+    assert find_decision(path, "ETHTMN") is None
