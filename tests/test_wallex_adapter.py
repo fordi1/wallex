@@ -130,3 +130,62 @@ async def test_tickers_parse_market_stats(monkeypatch) -> None:
     assert tickers["BTCTMN"]["last"] == Decimal("22062999871.0")
     assert tickers["BTCTMN"]["change_24h"] == Decimal("-2.39")
     assert "EMPTYTMN" not in tickers
+
+
+def _client_with(handler) -> WallexClient:
+    import httpx
+
+    client = WallexClient("https://example.test", "wss://example.test", "test-key", max_retries=2)
+    client._http = httpx.AsyncClient(
+        base_url="https://example.test",
+        transport=httpx.MockTransport(handler),
+        headers={"X-API-Key": "test-key"},
+    )
+    return client
+
+
+@pytest.mark.asyncio
+async def test_reads_retry_after_a_server_disconnect(monkeypatch) -> None:
+    import httpx
+
+    calls = []
+    monkeypatch.setattr("wallex_engine.exchange.wallex_client.asyncio.sleep", _no_sleep)
+
+    def handler(request):
+        calls.append(request.method)
+        if len(calls) == 1:
+            raise httpx.RemoteProtocolError("Server disconnected without sending a response.")
+        return httpx.Response(200, json={"result": {"symbols": {}}})
+
+    client = _client_with(handler)
+    try:
+        assert await client.get_tickers(["BTCTMN"]) == {}
+    finally:
+        await client.close()
+    assert calls == ["GET", "GET"]
+
+
+@pytest.mark.asyncio
+async def test_order_writes_are_never_blindly_retried(monkeypatch) -> None:
+    import httpx
+
+    from wallex_engine.errors import ExchangeError
+
+    calls = []
+    monkeypatch.setattr("wallex_engine.exchange.wallex_client.asyncio.sleep", _no_sleep)
+
+    def handler(request):
+        calls.append(request.method)
+        raise httpx.ReadTimeout("no answer")
+
+    client = _client_with(handler)
+    try:
+        with pytest.raises(ExchangeError, match="ambiguous"):
+            await client._request("POST", "/v1/account/orders", private=True, json_body={})
+    finally:
+        await client.close()
+    assert calls == ["POST"]
+
+
+async def _no_sleep(*_args, **_kwargs) -> None:
+    return None

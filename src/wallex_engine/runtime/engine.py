@@ -7,10 +7,17 @@ from decimal import Decimal
 from typing import Any
 from uuid import uuid4
 
+import httpx
+
 from ..ai.providers import AIReviewService
 from ..config import AppConfig
 from ..data.market_data import WallexMarketDataSource, resample_completed
-from ..errors import ConfigurationError, ReconciliationError, StaleMarketDataError
+from ..errors import (
+    ConfigurationError,
+    ExchangeError,
+    ReconciliationError,
+    StaleMarketDataError,
+)
 from ..execution.brokers import LiveBroker, ShadowBroker, client_order_id, quantize_price
 from ..features.indicators import feature_snapshots
 from ..lifecycle import flatten_plan
@@ -65,6 +72,9 @@ class BookFeed:
             self.books[book.symbol] = book
 
 
+TRANSIENT_ERRORS = (httpx.TransportError, ExchangeError, StaleMarketDataError)
+
+
 class TradingRuntime:
     def __init__(
         self,
@@ -99,6 +109,7 @@ class TradingRuntime:
         self.run_id = f"{mode}-{datetime.now(tz=UTC):%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}"
         self._last_decision: dict[str, datetime] = {}
         self._last_reconcile = datetime.min.replace(tzinfo=UTC)
+        self._transient_failures = 0
         self._regimes: dict[str, tuple[datetime, RegimeDecision]] = {}
         self._markets: dict[str, MarketSpec] = {}
         self._feed: BookFeed | None = None
@@ -122,12 +133,36 @@ class TradingRuntime:
         await self.alerts.send("process_started", "موتور معاملاتی راه‌اندازی شد.", mode=self.mode)
         try:
             while True:
-                await self.run_cycle()
-                await asyncio.sleep(5)
+                await asyncio.sleep(await self._guarded_cycle())
         finally:
             self.health.ready = False
             if self._feed:
                 await self._feed.close()
+
+    async def _guarded_cycle(self) -> float:
+        """Run one cycle; a transient exchange/network fault pauses instead of crashing.
+
+        Reconciliation drift and configuration errors still stop the process (fail closed).
+        Returns the delay before the next cycle.
+        """
+        try:
+            await self.run_cycle()
+        except TRANSIENT_ERRORS as exc:
+            self._transient_failures += 1
+            self.health.ready = False
+            self.health.detail = "اختلال موقت در اتصال به والکس؛ تلاش دوباره…"
+            if self._transient_failures in (1, 12):
+                await self.alerts.send(
+                    "exchange_degraded",
+                    f"اختلال موقت در اتصال به والکس ({type(exc).__name__}).",
+                    failures=self._transient_failures,
+                )
+            return min(60.0, 5.0 * 2 ** min(self._transient_failures, 4))
+        if self._transient_failures:
+            self.health.ready = True
+            self.health.detail = "سرویس آماده است"
+            self._transient_failures = 0
+        return 5.0
 
     async def run_cycle(self) -> None:
         now = datetime.now(tz=UTC)

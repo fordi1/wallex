@@ -90,8 +90,12 @@ class WallexClient:
                 if isinstance(payload, dict) and payload.get("success") is False:
                     raise ExchangeError(str(payload.get("message") or "Wallex rejected request"))
                 return payload
-            except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            except httpx.TransportError as exc:
                 last_error = type(exc).__name__
+                if method.upper() != "GET":
+                    # The order may have reached Wallex; the broker reconciles by client ID
+                    # instead of resending and risking a duplicate.
+                    raise ExchangeError(f"ambiguous Wallex {method} after {last_error}") from exc
                 if attempt < self.max_retries:
                     await asyncio.sleep(min(8.0, 0.5 * (2**attempt)))
                     continue
