@@ -35,6 +35,9 @@ def decision_frame(path: Path) -> pd.DataFrame:
                     "action": signal.get("action"),
                     "strategy": signal.get("strategy"),
                     "signal_reason": signal.get("reason_fa"),
+                    "entry_price": _number(signal.get("entry_price")),
+                    "stop_price": _number(signal.get("stop_price")),
+                    "target_price": _number(signal.get("target_price")),
                     "ai_regime": regime.get("regime"),
                     "ai_allow": regime.get("allow_entries"),
                     "ai_size": regime.get("size_multiplier"),
@@ -64,6 +67,39 @@ def decision_summary(frame: pd.DataFrame) -> dict[str, int]:
         "filled": int((frame["outcome"] == "filled").sum()),
         "ai_vetoes": int(vetoed.sum()),
     }
+
+
+def trade_markers(frame: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """Shadow/live fills and AI-vetoed signals for one symbol, ready to plot on a chart."""
+    columns = ["created_at", "kind", "price", "stop_price", "target_price", "row"]
+    if frame.empty:
+        return pd.DataFrame(columns=columns)
+    view = frame[(frame["symbol"] == symbol) & frame["mode"].isin(["shadow", "live"])]
+    signals = view[view["action"].fillna("SKIP") != "SKIP"]
+    filled = signals["outcome"] == "filled"
+    vetoed = (signals["ai_approve"] == False) | (signals["ai_allow"] == False)  # noqa: E712
+    kinds = pd.Series(None, index=signals.index, dtype=object)
+    kinds[filled & (signals["action"] == "ENTER_LONG")] = "entry"
+    kinds[filled & (signals["action"] == "EXIT")] = "exit"
+    kinds[~filled & vetoed] = "vetoed"
+    picked = signals[kinds.notna() & signals["entry_price"].notna()]
+    return pd.DataFrame(
+        {
+            "created_at": picked["created_at"],
+            "kind": kinds[picked.index],
+            "price": picked["entry_price"],
+            "stop_price": picked["stop_price"],
+            "target_price": picked["target_price"],
+            "row": picked.index,
+        }
+    ).reset_index(drop=True)
+
+
+def _number(value: object) -> float | None:
+    try:
+        return float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def parse_report_tables(path: Path) -> tuple[dict[str, float], dict[str, float]]:

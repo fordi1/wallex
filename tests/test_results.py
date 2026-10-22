@@ -70,3 +70,24 @@ def test_load_sweeps_reads_rows(tmp_path) -> None:
     sweeps = load_sweeps(tmp_path)
     assert list(sweeps) == ["sweep_15m"]
     assert sweeps["sweep_15m"][0]["in_ret_sum"] == 0.1
+
+
+def test_trade_markers_pick_live_and_shadow_fills_and_ai_vetoes(tmp_path) -> None:
+    from wallex_engine.reporting.results import trade_markers
+
+    entry = decision("shadow", "filled")
+    entry["signal"].update(entry_price="100", stop_price="95", target_price="115")
+    exit_ = decision("live", "filled")
+    exit_["signal"].update(action="EXIT", entry_price="110")
+    vetoed = decision("shadow", "rejected", approve=False)
+    vetoed["signal"]["entry_price"] = "105"
+    ignored = [decision("backtest", "filled"), decision("shadow", "skipped")]
+    other_symbol = decision("shadow", "filled")
+    other_symbol["symbol"] = "ETHTMN"
+    path = tmp_path / "decisions.jsonl"
+    rows = [entry, exit_, vetoed, other_symbol, *ignored]
+    path.write_text("\n".join(json.dumps(r, ensure_ascii=False) for r in rows), encoding="utf-8")
+    markers = trade_markers(decision_frame(path), "BTCTMN")
+    assert sorted(markers["kind"]) == ["entry", "exit", "vetoed"]
+    assert markers.set_index("kind").loc["entry", "price"] == 100
+    assert markers.set_index("kind").loc["exit", "price"] == 110

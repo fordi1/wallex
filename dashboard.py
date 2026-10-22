@@ -32,6 +32,7 @@ from wallex_engine.reporting.results import (  # noqa: E402
     decision_summary,
     load_sweeps,
     parse_report_tables,
+    trade_markers,
 )
 from wallex_engine.runtime.control import (  # noqa: E402
     EngineController,
@@ -531,8 +532,88 @@ def _chart_time(value: object, timeframe_minutes: int, *, full: bool = False) ->
     return rendered.rsplit("، ", 1)[-1]
 
 
+MARKER_STYLES = {
+    "entry": ("ورود", "triangle-up", CHART_SUCCESS),
+    "exit": ("خروج", "triangle-down", CHART_DESTRUCTIVE),
+    "vetoed": ("رد توسط AI", "x", CHART_MUTED),
+}
+
+
+def _wrap(text: object, width: int = 48) -> str:
+    words = html.escape(str(text or "—")).split()
+    lines, current = [], ""
+    for word in words:
+        if current and len(current) + len(word) + 1 > width:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    lines.append(current)
+    return "<br>".join(lines)
+
+
+def chart_markers(config, symbol: str) -> pd.DataFrame:
+    """Shadow/live decisions for the chart, each with a Persian hover explanation."""
+    path = Path(config.app.logs_dir) / "decisions.jsonl"
+    if not path.exists():
+        return pd.DataFrame()
+    decisions = load_decisions(str(path), path.stat().st_mtime)
+    markers = trade_markers(decisions, symbol)
+    if markers.empty:
+        return markers
+    texts = []
+    for marker in markers.itertuples():
+        row = decisions.loc[marker.row]
+        label = MARKER_STYLES[marker.kind][0]
+        parts = [
+            f"<b>{label} · {MODE_LABELS.get(row['mode'], row['mode'])}</b>",
+            f"قیمت: {format_money(marker.price)}",
+        ]
+        if marker.kind == "entry" and pd.notna(marker.stop_price):
+            parts.append(
+                f"حد ضرر: {format_money(marker.stop_price)} · هدف: {format_money(marker.target_price)}"
+            )
+        parts.append(f"قواعد: {_wrap(row['signal_reason'])}")
+        parts.append(f"رژیم AI: {_wrap(row['ai_regime_reason'])}")
+        parts.append(f"بازبینی AI: {_wrap(row['ai_review_reason'])}")
+        texts.append("<br>".join(parts))
+    return markers.assign(text=texts)
+
+
+def add_trade_markers(figure: go.Figure, markers: pd.DataFrame, x_values) -> None:
+    if markers is None or markers.empty or not len(x_values):
+        return
+    start, end = x_values[0], x_values[-1]
+    visible = markers[(markers["created_at"] >= start) & (markers["created_at"] <= end)]
+    for kind, (label, symbol, color) in MARKER_STYLES.items():
+        subset = visible[visible["kind"] == kind]
+        if subset.empty:
+            continue
+        figure.add_trace(
+            go.Scatter(
+                x=subset["created_at"],
+                y=subset["price"],
+                name=label,
+                mode="markers",
+                marker={
+                    "symbol": symbol,
+                    "size": 15,
+                    "color": color,
+                    "line": {"color": CHART_SURFACE, "width": 1.5},
+                },
+                text=subset["text"],
+                hovertemplate="%{text}<extra></extra>",
+            ),
+            row=1,
+            col=1,
+        )
+
+
 def market_chart(
-    view: MarketExplorerView, chart_type: str, indicators: list[str]
+    view: MarketExplorerView,
+    chart_type: str,
+    indicators: list[str],
+    markers: pd.DataFrame | None = None,
 ) -> go.Figure:
     frame = chart_indicator_frame(list(view.chart_candles))
     show_volume = "حجم" in indicators
@@ -627,6 +708,7 @@ def market_chart(
             row=1,
             col=1,
         )
+    add_trade_markers(figure, markers, x_values)
     next_row = 2
     if show_volume:
         volume_colors = [
@@ -890,7 +972,9 @@ def render_live_terminal(
         )
         st.markdown('<div class="chart-shell">', unsafe_allow_html=True)
         st.plotly_chart(
-            market_chart(view, chart_type, list(indicators)),
+            market_chart(
+                view, chart_type, list(indicators), chart_markers(config, view.market.symbol)
+            ),
             width="stretch",
             config={
                 "displayModeBar": True,
