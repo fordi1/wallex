@@ -44,6 +44,22 @@ class Explanation:
         return sum(1 for check in self.checks if check.family == family and not check.passed)
 
 
+def trail_position(
+    position: Position, high: Decimal, close: Decimal, atr: Decimal, stop_atr: Decimal
+) -> Position:
+    """Once price has moved one initial risk (1R) up, trail the stop at close - stop_atr*ATR.
+
+    Shared by backtest and the live/shadow runtime so both manage exits identically.
+    """
+    if position.stop_price is None:
+        return position
+    initial_risk = position.average_entry - position.stop_price
+    if initial_risk <= 0 or high < position.average_entry + initial_risk:
+        return position
+    trailing = max(position.trailing_stop or Decimal(0), close - stop_atr * atr)
+    return position.model_copy(update={"trailing_stop": trailing})
+
+
 def aligned(votes: tuple[Vote, ...], direction: str) -> bool:
     """No vote against ``direction`` and at most one neutral vote."""
     opposite = "down" if direction == "up" else "up"
@@ -250,10 +266,11 @@ class HybridStrategy:
         decision_id = decision_identifier(snapshot.symbol, snapshot.observed_at, "exit")
         if position.quantity <= 0:
             return self._skip(decision_id, snapshot, "موقعیت بازی وجود ندارد.")
+        urgent = False
         if position.stop_price is not None and snapshot.close <= position.stop_price:
-            reason = "حد ضرر فعال شد."
+            reason, urgent = "حد ضرر فعال شد.", True
         elif position.trailing_stop is not None and snapshot.close <= position.trailing_stop:
-            reason = "حد ضرر دنبال‌کننده فعال شد."
+            reason, urgent = "حد ضرر دنبال‌کننده فعال شد.", True
         elif position.target_price is not None and snapshot.close >= position.target_price:
             reason = "هدف سود محقق شد."
         elif self.config.confluence_enabled and aligned(self.votes(snapshot), "down"):
@@ -270,6 +287,7 @@ class HybridStrategy:
             strategy=StrategyFamily.NONE,
             entry_price=snapshot.close,
             reason_fa=reason,
+            urgent=urgent,
         )
 
     def _fresh_cross(self, snapshot: FeatureSnapshot) -> bool:

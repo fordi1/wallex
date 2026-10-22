@@ -138,6 +138,8 @@ class TradeSignal(StrictModel):
     target_price: Decimal | None = None
     expected_move_bps: Decimal = Decimal("0")
     reason_fa: str
+    # Protective exits (stop, trailing stop) must leave at market, not wait on a limit.
+    urgent: bool = False
 
 
 class RegimeDecision(StrictModel):

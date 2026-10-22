@@ -39,7 +39,7 @@ from ..models import (
 from ..protocols import Broker, ExchangeClient
 from ..risk.manager import PortfolioRiskManager
 from ..storage.database import SqlEventStore
-from ..strategy.hybrid import HybridStrategy
+from ..strategy.hybrid import HybridStrategy, trail_position
 from .alerts import AlertManager
 from .health import HealthState
 
@@ -267,21 +267,11 @@ class TradingRuntime:
             return
         self._last_decision[symbol] = snapshot.observed_at
         existing = next((item for item in positions if item.symbol == symbol), None)
-        signal = (
-            self.strategy.evaluate_exit(snapshot, existing)
-            if existing
-            else self.strategy.evaluate(snapshot)
-        )
-        if signal.action == SignalAction.EXIT and existing:
-            if (
-                existing.opened_at
-                and snapshot.observed_at - existing.opened_at
-                < timedelta(minutes=self.config.risk.min_hold_minutes)
-                and "ضرر" not in signal.reason_fa
-            ):
-                return
-            await self._exit_position(signal.decision_id, existing, book, False)
+        if existing:
+            candle = next((c for c in five if c.opened_at == snapshot.observed_at), five[-1])
+            await self._manage_position(existing, snapshot, candle, book)
             return
+        signal = self.strategy.evaluate(snapshot)
         cached_regime = self._regimes.get(symbol)
         if cached_regime and snapshot.observed_at - cached_regime[0] < timedelta(minutes=30):
             regime = cached_regime[1]
@@ -322,6 +312,32 @@ class TradingRuntime:
                 else signal.reason_fa,
             )
         )
+
+    async def _manage_position(
+        self, position: Position, snapshot: Any, candle: Any, book: Any
+    ) -> None:
+        """One new signal bar for an open position: count it, exit if due, else trail.
+
+        Mirrors the backtest: bars_held drives the time stop and the trailing stop starts
+        once price has moved one initial risk in our favour.
+        """
+        position = position.model_copy(update={"bars_held": position.bars_held + 1})
+        await self.store.upsert_position(position)
+        signal = self.strategy.evaluate_exit(snapshot, position)
+        if signal.action == SignalAction.EXIT:
+            too_early = position.opened_at is not None and (
+                snapshot.observed_at - position.opened_at
+                < timedelta(minutes=self.config.risk.min_hold_minutes)
+            )
+            if too_early and not signal.urgent:
+                return
+            await self._exit_position(signal.decision_id, position, book, signal.urgent)
+            return
+        trailed = trail_position(
+            position, candle.high, candle.close, snapshot.atr_14, self.config.strategy.stop_atr
+        )
+        if trailed != position:
+            await self.store.upsert_position(trailed)
 
     async def _execute_entry(
         self, signal: Any, quantity: Decimal, market: MarketSpec, initial_book: OrderBookSnapshot

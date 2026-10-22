@@ -27,7 +27,7 @@ from ..models import (
 )
 from ..risk.manager import PortfolioRiskManager
 from ..storage.database import SqlEventStore
-from ..strategy.hybrid import HybridStrategy
+from ..strategy.hybrid import HybridStrategy, trail_position
 
 
 @dataclass(frozen=True)
@@ -85,7 +85,6 @@ class BacktestEngine:
         peak = cash
         position: Position | None = None
         entry_fee = Decimal(0)
-        initial_risk_per_unit = Decimal(0)
         trades: list[dict[str, object]] = []
         equity_rows: list[dict[str, object]] = []
         rejects = 0
@@ -127,16 +126,14 @@ class BacktestEngine:
                     self.risk.record_exit(position.symbol, pnl, snapshot.observed_at)
                     await self.store.delete_position(position.symbol)
                     position = None
-                elif (
-                    initial_risk_per_unit > 0
-                    and candle.high >= position.average_entry + initial_risk_per_unit
-                ):
-                    trailing = max(
-                        position.trailing_stop or Decimal(0),
-                        candle.close - self.config.strategy.stop_atr * snapshot.atr_14,
+                else:
+                    trailed = trail_position(
+                        position, candle.high, candle.close, snapshot.atr_14,
+                        self.config.strategy.stop_atr,
                     )
-                    position = position.model_copy(update={"trailing_stop": trailing})
-                    await self.store.upsert_position(position)
+                    if trailed != position:
+                        position = trailed
+                        await self.store.upsert_position(position)
 
             market_value = position.quantity * candle.close if position else Decimal(0)
             equity = cash + market_value
@@ -231,9 +228,6 @@ class BacktestEngine:
                             stop_price=signal.stop_price,
                             target_price=signal.target_price,
                             opened_at=execution_time,
-                        )
-                        initial_risk_per_unit = execution_price - (
-                            signal.stop_price or execution_price
                         )
                         await self.store.upsert_position(position)
                         outcome = "filled"

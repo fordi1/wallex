@@ -172,3 +172,20 @@ def test_confluence_enters_when_all_bullish_and_exits_when_all_bearish(config, f
                         stop_price=Decimal("80"), target_price=Decimal("130"))
     assert on.evaluate_exit(bearish, position).action == SignalAction.EXIT
     assert off.evaluate_exit(bearish, position).action == SignalAction.SKIP
+
+
+def test_trailing_stop_starts_after_one_r_and_only_rises() -> None:
+    from wallex_engine.models import Position
+    from wallex_engine.strategy.hybrid import trail_position
+
+    position = Position(symbol="BTCTMN", quantity=Decimal("1"), average_entry=Decimal("100"),
+                        stop_price=Decimal("97"), target_price=Decimal("109"))
+    below_one_r = trail_position(position, Decimal("102.9"), Decimal("102"), Decimal("1"),
+                                 Decimal("1.5"))
+    assert below_one_r.trailing_stop is None
+    trailed = trail_position(position, Decimal("103.5"), Decimal("103"), Decimal("1"),
+                             Decimal("1.5"))
+    assert trailed.trailing_stop == Decimal("101.5")
+    lower_close = trail_position(trailed, Decimal("104"), Decimal("102"), Decimal("1"),
+                                 Decimal("1.5"))
+    assert lower_close.trailing_stop == Decimal("101.5")
