@@ -45,9 +45,7 @@ class HybridStrategy:
         if snapshot.spread_bps > self.config.max_spread_bps:
             return self._skip(decision_id, snapshot, "اسپرد بازار بیش از حد مجاز است.")
 
-        crossed_up = (
-            snapshot.previous_ema_9 <= snapshot.previous_ema_21 and snapshot.ema_9 > snapshot.ema_21
-        )
+        crossed_up = self._fresh_cross(snapshot)
         hourly_up = (
             snapshot.hourly_ema_20 > snapshot.hourly_ema_50
             and snapshot.close > snapshot.hourly_ema_50
@@ -112,9 +110,10 @@ class HybridStrategy:
         checks = (
             Check("common", "spread", "اسپرد کمتر از سقف", spread_ok,
                   float(s.spread_bps), float(cfg.max_spread_bps), "bps"),
-            Check("trend", "ema_cross", "تقاطع صعودی EMA ۹ از EMA ۲۱",
-                  s.previous_ema_9 <= s.previous_ema_21 and s.ema_9 > s.ema_21,
-                  float(s.ema_9 - s.ema_21), 0.0),
+            Check("trend", "ema_cross", "تقاطع صعودی تازه EMA ۹ از EMA ۲۱",
+                  self._fresh_cross(s),
+                  None if s.ema_cross_age is None else float(s.ema_cross_age),
+                  float(cfg.cross_window_bars - 1), "bars"),
             Check("trend", "hourly_trend", "روند ساعتی صعودی (EMA ۲۰ > EMA ۵۰)",
                   s.hourly_ema_20 > s.hourly_ema_50,
                   float(s.hourly_ema_20), float(s.hourly_ema_50)),
@@ -176,6 +175,18 @@ class HybridStrategy:
             strategy=StrategyFamily.NONE,
             entry_price=snapshot.close,
             reason_fa=reason,
+        )
+
+    def _fresh_cross(self, snapshot: FeatureSnapshot) -> bool:
+        if snapshot.ema_cross_age is None:
+            # Not above, or a decision logged before ema_cross_age existed (same-bar rule).
+            return (
+                snapshot.previous_ema_9 <= snapshot.previous_ema_21
+                and snapshot.ema_9 > snapshot.ema_21
+            )
+        return (
+            snapshot.ema_9 > snapshot.ema_21
+            and snapshot.ema_cross_age < self.config.cross_window_bars
         )
 
     def _edge_is_sufficient(self, snapshot: FeatureSnapshot, expected_move_bps: Decimal) -> bool:

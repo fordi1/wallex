@@ -118,6 +118,30 @@ over 5m (1.0, 1.25, 1.5) and 15m (1.0, 1.5); lowering the safety factor added
 trades but they were net losers. ETHTMN never passed the cost filter because
 its spread alone is ~0.33%, which is the intended behaviour.
 
+### Why so few signals (bottleneck analysis, BTCTMN 15m, 652 decisions)
+
+| Condition | Share of bars where it held |
+|---|---|
+| EMA 9/21 cross on this bar | 2.1% |
+| Hourly EMA20 > EMA50 | 37% |
+| Close above hourly EMA50 | 46% |
+| Volume z-score > 0 | 37% |
+| Fee-adjusted edge | 76% |
+
+The same-bar cross was the single blocker in 52 near misses, so a
+`cross_window_bars` setting (enter while the cross is at most N-1 bars old)
+was tested on the same split (`reports/sweep_cross.json`):
+
+| Window | In-sample | Out-of-sample | Out-of-sample trades |
+|---|---|---|---|
+| **1** (kept) | +0.005% | **+0.045%** | 1 |
+| 3 | +0.005% | +0.020% | 2 |
+| 5 | +0.005% | +0.001% | 3 |
+
+Later entries after the cross added trades but each one paid the full cost
+for less of the move, so the window stays at 1. Low frequency is the
+consequence of a ~0.55% round-trip cost, not a missing signal.
+
 ### AI on vs off (BTCTMN, live BoxAPI model, 15m)
 
 Source: `reports/bt-BTCTMN-20261022T194935Z-e15822.md` and its `-ai-off` twin.

@@ -1,0 +1,108 @@
+{
+  "split": "2026-10-19T00:00:00+03:30",
+  "grid": {
+    "signal_timeframe_minutes": [
+      15
+    ],
+    "stop_atr": [
+      "1.5"
+    ],
+    "trend_target_r": [
+      "3"
+    ],
+    "safety_factor": [
+      "1.25"
+    ],
+    "cross_window_bars": [
+      1,
+      3,
+      5
+    ]
+  },
+  "rows": [
+    {
+      "signal_timeframe_minutes": 15,
+      "stop_atr": "1.5",
+      "trend_target_r": "3",
+      "safety_factor": "1.25",
+      "cross_window_bars": 1,
+      "BTCTMN_in_ret": 0.005,
+      "BTCTMN_in_trades": 2,
+      "BTCTMN_in_dd": 0.067,
+      "BTCTMN_out_ret": 0.045,
+      "BTCTMN_out_trades": 1,
+      "BTCTMN_out_dd": 0.01,
+      "ETHTMN_in_ret": 0.0,
+      "ETHTMN_in_trades": 0,
+      "ETHTMN_in_dd": 0.0,
+      "ETHTMN_out_ret": 0.0,
+      "ETHTMN_out_trades": 0,
+      "ETHTMN_out_dd": 0.0,
+      "in_ret_sum": 0.005,
+      "out_ret_sum": 0.045
+    },
+    {
+      "signal_timeframe_minutes": 15,
+      "stop_atr": "1.5",
+      "trend_target_r": "3",
+      "safety_factor": "1.25",
+      "cross_window_bars": 3,
+      "BTCTMN_in_ret": 0.005,
+      "BTCTMN_in_trades": 2,
+      "BTCTMN_in_dd": 0.067,
+      "BTCTMN_out_ret": 0.02,
+      "BTCTMN_out_trades": 2,
+      "BTCTMN_out_dd": 0.033,
+      "ETHTMN_in_ret": 0.0,
+      "ETHTMN_in_trades": 0,
+      "ETHTMN_in_dd": 0.0,
+      "ETHTMN_out_ret": 0.0,
+      "ETHTMN_out_trades": 0,
+      "ETHTMN_out_dd": 0.0,
+      "in_ret_sum": 0.005,
+      "out_ret_sum": 0.02
+    },
+    {
+      "signal_timeframe_minutes": 15,
+      "stop_atr": "1.5",
+      "trend_target_r": "3",
+      "safety_factor": "1.25",
+      "cross_window_bars": 5,
+      "BTCTMN_in_ret": 0.005,
+      "BTCTMN_in_trades": 2,
+      "BTCTMN_in_dd": 0.067,
+      "BTCTMN_out_ret": 0.001,
+      "BTCTMN_out_trades": 3,
+      "BTCTMN_out_dd": 0.051,
+      "ETHTMN_in_ret": 0.0,
+      "ETHTMN_in_trades": 0,
+      "ETHTMN_in_dd": 0.0,
+      "ETHTMN_out_ret": 0.0,
+      "ETHTMN_out_trades": 0,
+      "ETHTMN_out_dd": 0.0,
+      "in_ret_sum": 0.005,
+      "out_ret_sum": 0.001
+    }
+  ],
+  "best": {
+    "signal_timeframe_minutes": 15,
+    "stop_atr": "1.5",
+    "trend_target_r": "3",
+    "safety_factor": "1.25",
+    "cross_window_bars": 1,
+    "BTCTMN_in_ret": 0.005,
+    "BTCTMN_in_trades": 2,
+    "BTCTMN_in_dd": 0.067,
+    "BTCTMN_out_ret": 0.045,
+    "BTCTMN_out_trades": 1,
+    "BTCTMN_out_dd": 0.01,
+    "ETHTMN_in_ret": 0.0,
+    "ETHTMN_in_trades": 0,
+    "ETHTMN_in_dd": 0.0,
+    "ETHTMN_out_ret": 0.0,
+    "ETHTMN_out_trades": 0,
+    "ETHTMN_out_dd": 0.0,
+    "in_ret_sum": 0.005,
+    "out_ret_sum": 0.045
+  }
+}

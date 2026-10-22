@@ -27,6 +27,8 @@ strategy:
   stop_atr: "1.5"
   trend_target_r: "3"  # best in-sample in reports/param_sweep.json
   time_stop_bars: 12
+  # 3 and 5 added trades but lowered out-of-sample return: reports/sweep_cross.json
+  cross_window_bars: 1
 
 risk:
   risk_per_trade: "0.01"

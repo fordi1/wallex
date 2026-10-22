@@ -57,20 +57,72 @@ def test_explain_lists_every_condition_with_pass_or_fail(config, feature) -> Non
     atr=st.decimals("0.1", "6", places=2),
     spread=st.decimals("0", "40", places=1),
     volume_z=st.decimals("-2", "2", places=2),
+    cross_age=st.one_of(st.none(), st.integers(0, 8)),
+    window=st.integers(1, 5),
 )
 def test_explain_verdict_always_matches_evaluate(
     config, feature, close, ema_9, previous_ema_9, hourly_ema_20, previous_close,
-    previous_rsi, atr, spread, volume_z,
+    previous_rsi, atr, spread, volume_z, cross_age, window,
 ) -> None:
     snapshot = feature.model_copy(
         update={
             "close": close, "ema_9": ema_9, "previous_ema_9": previous_ema_9,
             "hourly_ema_20": hourly_ema_20, "previous_close": previous_close,
             "previous_rsi_14": previous_rsi, "atr_14": atr, "spread_bps": spread,
-            "volume_zscore_20": volume_z,
+            "volume_zscore_20": volume_z, "ema_cross_age": cross_age,
         }
     )
-    strategy = HybridStrategy(config.strategy)
+    strategy = HybridStrategy(config.strategy.model_copy(update={"cross_window_bars": window}))
     signal = strategy.evaluate(snapshot)
     explanation = strategy.explain(snapshot)
     assert (explanation.action, explanation.strategy) == (signal.action, signal.strategy)
+
+
+def test_cross_window_allows_entry_a_few_bars_after_the_cross(config, feature) -> None:
+    # EMA 9 crossed above EMA 21 two bars ago and is still above.
+    later = feature.model_copy(
+        update={"previous_ema_9": Decimal("98.8"), "previous_ema_21": Decimal("98.4"),
+                "ema_cross_age": 2}
+    )
+    strict = HybridStrategy(config.strategy.model_copy(update={"cross_window_bars": 1}))
+    wide = HybridStrategy(config.strategy.model_copy(update={"cross_window_bars": 3}))
+    assert strict.evaluate(later).action == SignalAction.SKIP
+    assert wide.evaluate(later).action == SignalAction.ENTER_LONG
+    below = later.model_copy(update={"ema_9": Decimal("98"), "ema_cross_age": None})
+    assert wide.evaluate(below).action == SignalAction.SKIP
+
+
+def test_ema_cross_age_counts_bars_since_upward_cross() -> None:
+    import pandas as pd
+
+    from wallex_engine.features.indicators import ema_cross_age
+
+    ema_9 = pd.Series([1.0, 1.0, 3.0, 3.0, 3.0, 1.0, 3.0])
+    ema_21 = pd.Series([2.0] * 7)
+    assert list(ema_cross_age(ema_9, ema_21)) == [None, None, 0, 1, 2, None, 0]
+    always_above = ema_cross_age(pd.Series([3.0, 3.0]), pd.Series([2.0, 2.0]))
+    assert all(age is not None and age >= 10_000 for age in always_above)
+
+
+def test_indicator_frame_keeps_bars_where_ema_9_is_below(feature) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from wallex_engine.features.indicators import indicator_frame
+    from wallex_engine.models import Candle
+
+    start = datetime(2026, 10, 1, tzinfo=UTC)
+    closes = [100 + (i % 40 if i % 80 < 40 else 40 - i % 40) for i in range(400)]
+
+    def candle(i: int, minutes: int, close: float) -> Candle:
+        return Candle(symbol="BTCTMN", timeframe_minutes=minutes,
+                      opened_at=start + timedelta(minutes=minutes * i),
+                      open=Decimal(str(close)), high=Decimal(str(close + 1)),
+                      low=Decimal(str(close - 1)), close=Decimal(str(close)),
+                      volume=Decimal("1") + i % 3, completed=True)
+
+    fifteen = [candle(i, 15, c) for i, c in enumerate(closes)]
+    hourly = [candle(i, 60, c) for i, c in enumerate(closes[:110])]
+    frame = indicator_frame(fifteen, hourly)
+    below = frame[frame["ema_9"] <= frame["ema_21"]]
+    assert len(below) > 20
+    assert below["ema_cross_age"].isna().all()

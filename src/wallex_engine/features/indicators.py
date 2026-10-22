@@ -8,6 +8,26 @@ import pandas as pd
 from ..data.market_data import candles_to_frame
 from ..models import Candle, FeatureSnapshot, OrderBookSnapshot
 
+UNKNOWN_CROSS_AGE = 10_000  # EMA 9 above EMA 21 for the whole window: the cross was not seen
+
+
+def ema_cross_age(ema_9: pd.Series, ema_21: pd.Series) -> list[int | None]:
+    """Bars since EMA 9 last crossed above EMA 21; None while it is not above."""
+    above = (ema_9 > ema_21).to_numpy()
+    ages: list[int | None] = []
+    age: int | None = None
+    for index, is_above in enumerate(above):
+        if not is_above:
+            age = None
+        elif index > 0 and not above[index - 1]:
+            age = 0
+        elif age is None:
+            age = UNKNOWN_CROSS_AGE
+        else:
+            age += 1
+        ages.append(age)
+    return ages
+
 
 def indicator_frame(candles_5m: list[Candle], candles_1h: list[Candle]) -> pd.DataFrame:
     five = candles_to_frame([c for c in candles_5m if c.completed]).copy()
@@ -17,6 +37,9 @@ def indicator_frame(candles_5m: list[Candle], candles_1h: list[Candle]) -> pd.Da
         hourly[column] = hourly[column].astype(float)
     five["ema_9"] = five["close"].ewm(span=9, adjust=False).mean()
     five["ema_21"] = five["close"].ewm(span=21, adjust=False).mean()
+    five["ema_cross_age"] = pd.Series(
+        ema_cross_age(five["ema_9"], five["ema_21"]), index=five.index, dtype=object
+    )
     delta = five["close"].diff()
     gains = delta.clip(lower=0).ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
     losses = (-delta.clip(upper=0)).ewm(alpha=1 / 14, adjust=False, min_periods=14).mean()
@@ -46,7 +69,9 @@ def indicator_frame(candles_5m: list[Candle], candles_1h: list[Candle]) -> pd.Da
     hourly["hourly_ema_20"] = hourly["close"].ewm(span=20, adjust=False).mean()
     hourly["hourly_ema_50"] = hourly["close"].ewm(span=50, adjust=False).mean()
     aligned = hourly[["hourly_ema_20", "hourly_ema_50"]].reindex(five.index, method="ffill")
-    return five.join(aligned).dropna()
+    frame = five.join(aligned)
+    # ema_cross_age is legitimately empty while EMA 9 is below EMA 21.
+    return frame.dropna(subset=[c for c in frame.columns if c != "ema_cross_age"])
 
 
 def feature_snapshots(
@@ -98,6 +123,7 @@ def feature_snapshots(
                 orderbook_imbalance_5=imbalance,
                 fee_rate=fee_rate,
                 modeled_slippage_bps=modeled_slippage_bps,
+                ema_cross_age=current["ema_cross_age"],
             )
         )
     return snapshots

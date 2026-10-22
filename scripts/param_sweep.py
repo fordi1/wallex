@@ -67,6 +67,7 @@ async def main() -> None:
     args.add_argument("--split", required=True)
     args.add_argument("--timeframes", help="comma list, e.g. 5,15")
     args.add_argument("--safety", help="comma list of safety_factor values, e.g. 1,1.25")
+    args.add_argument("--cross", help="comma list of cross_window_bars values, e.g. 1,3,5")
     args.add_argument("--out", default="param_sweep.json")
     ns = args.parse_args()
     grid = dict(DEFAULT_GRID)
@@ -77,6 +78,8 @@ async def main() -> None:
     base = load_config(ns.config)
     if ns.safety:
         grid["trend_target_r"] = [base.strategy.trend_target_r]
+    if ns.cross:
+        grid["cross_window_bars"] = [int(v) for v in ns.cross.split(",")]
     split = datetime.fromisoformat(ns.split)
     start, end = base.backtest.start, base.backtest.end
     candles = ParquetCandleStore(base.app.data_dir / "candles")

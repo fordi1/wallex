@@ -121,6 +121,9 @@ class FeatureSnapshot(StrictModel):
     orderbook_imbalance_5: Decimal
     fee_rate: Decimal
     modeled_slippage_bps: Decimal
+    # Bars since EMA 9 crossed above EMA 21 (0 = this bar); None while EMA 9 <= EMA 21
+    # or in decisions logged before this feature existed.
+    ema_cross_age: int | None = None
 
 
 class TradeSignal(StrictModel):
