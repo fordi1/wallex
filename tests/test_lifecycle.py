@@ -179,3 +179,81 @@ async def test_each_market_sees_positions_opened_earlier_in_the_same_cycle(confi
     runtime.store, runtime._cash_tmn, runtime._consider_symbol = Store(), cash, consider
     await runtime._consider_markets(Decimal("5000000"), Decimal("0.0025"))
     assert seen == [("BTCTMN", 0, Decimal("5000000")), ("ETHTMN", 1, Decimal("4750000"))]
+
+
+def _order(status, filled="0", side="BUY", client_id="c1", quantity="1"):
+    from wallex_engine.models import OrderRecord, OrderStatus, Side
+
+    return OrderRecord(client_id=client_id, status=OrderStatus(status), symbol="BTCTMN",
+                       side=Side(side), requested_quantity=Decimal(quantity),
+                       filled_quantity=Decimal(filled), average_price=Decimal("100"),
+                       updated_at=datetime(2026, 10, 23, tzinfo=UTC))
+
+
+def _live_runtime(config, final_orders: dict):
+    from wallex_engine.runtime.engine import TradingRuntime
+
+    runtime = object.__new__(TradingRuntime)
+    runtime.config = config.model_copy(
+        update={"execution": config.execution.model_copy(update={"entry_timeout_seconds": 0})}
+    )
+    runtime.mode, runtime._feed = "live", object()
+    runtime.submitted, runtime.canceled, runtime.positions = [], [], []
+
+    class Broker:
+        async def submit(self, intent):
+            runtime.submitted.append(intent)
+            return _order("OPEN", client_id=intent.client_id, side=intent.side.value)
+
+        async def cancel(self, order):
+            runtime.canceled.append(order.client_id)
+            return order.model_copy(update={"status": "CANCELED"})
+
+    class Client:
+        async def get_order(self, *, client_id=None, order_id=None):
+            return final_orders.get(client_id)
+
+        async def get_open_orders(self, symbol=None):
+            return [final_orders["protect"].model_copy(update={"status": "OPEN",
+                                                               "filled_quantity": Decimal(0)})]
+
+    class Store:
+        async def delete_position(self, symbol):
+            runtime.positions.append(("deleted", symbol))
+
+    async def position_from_order(signal, order, market):
+        runtime.positions.append(("opened", order.filled_quantity))
+
+    runtime.broker, runtime.client, runtime.store = Broker(), Client(), Store()
+    runtime._position_from_order = position_from_order
+    return runtime
+
+
+@pytest.mark.asyncio
+async def test_entry_fill_that_lands_during_cancel_is_kept_and_not_rebought(config, market):
+    from types import SimpleNamespace
+
+    from wallex_engine.execution.brokers import client_order_id
+
+    client_id = client_order_id("d1", 0)
+    runtime = _live_runtime(config, {client_id: _order("CANCELED", "0.4", client_id=client_id)})
+    book = SimpleNamespace(best_bid=Decimal("100"), best_ask=Decimal("101"))
+    signal = SimpleNamespace(decision_id="d1", entry_price=Decimal("100"))
+    outcome = await runtime._execute_entry(signal, Decimal("1"), market, book)
+    assert outcome == "partial_protected"
+    assert runtime.positions == [("opened", Decimal("0.4"))]
+    assert len(runtime.submitted) == 1
+
+
+@pytest.mark.asyncio
+async def test_exit_skips_selling_what_the_protective_stop_already_sold(config) -> None:
+    from types import SimpleNamespace
+
+    protect = _order("FILLED", "1", side="SELL", client_id="protect")
+    runtime = _live_runtime(config, {"protect": protect})
+    runtime._markets = {}
+    book = SimpleNamespace(best_bid=Decimal("100"), best_ask=Decimal("101"))
+    await runtime._exit_position("d2", _open_position(), book, True)
+    assert runtime.canceled == ["protect"]
+    assert runtime.submitted == []
+    assert runtime.positions == [("deleted", "BTCTMN")]

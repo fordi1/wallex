@@ -384,12 +384,22 @@ class TradingRuntime:
                     await self._position_from_order(signal, updated, market)
                     return "filled"
                 if updated and updated.status == OrderStatus.PARTIAL:
-                    await self.broker.cancel(updated)
-                    await self._position_from_order(signal, updated, market)
-                    return "partial_protected"
-            await self.broker.cancel(order)
+                    final = await self._cancel_and_settle(updated)
+                    await self._position_from_order(signal, final, market)
+                    return "filled" if final.status == OrderStatus.FILLED else "partial_protected"
+            final = await self._cancel_and_settle(order)
+            if final.filled_quantity > 0:
+                # Filled while we were cancelling: protect what we hold, never re-buy in full.
+                await self._position_from_order(signal, final, market)
+                return "filled" if final.status == OrderStatus.FILLED else "partial_protected"
             book = await self._feed.get(market.symbol)
         return "expired_without_market_conversion"
+
+    async def _cancel_and_settle(self, order: Any) -> Any:
+        """Cancel, then re-read the order: fills can land between our last read and the cancel."""
+        canceled = await self.broker.cancel(order)
+        final = await self.client.get_order(client_id=order.client_id)
+        return final or canceled
 
     async def _position_from_order(self, signal: Any, order: Any, market: MarketSpec) -> None:
         quantity = order.filled_quantity
@@ -457,8 +467,17 @@ class TradingRuntime:
             ]
             if any(order.client_id == desired_client_id for order in open_sells):
                 return
+            sold = Decimal(0)
             for order in open_sells:
-                await self.broker.cancel(order)
+                sold += (await self._cancel_and_settle(order)).filled_quantity
+            if sold > 0:
+                # The protective stop (or a prior exit) already sold part or all of it.
+                market = self._markets.get(position.symbol)
+                remaining = position.quantity - sold
+                if remaining <= (market.step_size if market else Decimal(0)):
+                    await self.store.delete_position(position.symbol)
+                    return
+                position = position.model_copy(update={"quantity": remaining})
         price = None
         if not use_market:
             price = flatten_limit_price(book, attempt)
