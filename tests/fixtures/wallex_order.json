@@ -1,0 +1,18 @@
+{
+  "success": true,
+  "result": {
+    "active": false,
+    "clientOrderId": "wai-sanitized",
+    "created_at": "2026-10-22T10:00:00Z",
+    "updated_at": "2026-10-22T10:00:01Z",
+    "executedPrice": "100",
+    "executedQty": "0.5",
+    "origQty": "0.5",
+    "price": "100",
+    "side": "BUY",
+    "status": "FILLED",
+    "symbol": "BTCTMN",
+    "type": "LIMIT"
+  }
+}
+

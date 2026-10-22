@@ -1,0 +1,30 @@
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.claude/
+.venv/
+
+# Python and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+
+# Local databases and raw market data (regenerable)
+*.db
+*.sqlite3
+data/*
+!data/manifests/
+
+# Judging deliverables are kept: decision log, trades and backtest reports
+logs/*
+!logs/decisions.jsonl
+!logs/trades.csv
+logs/engine-*.log
+logs/engine-process.json
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

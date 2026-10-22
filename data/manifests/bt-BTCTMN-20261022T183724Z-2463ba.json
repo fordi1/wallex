@@ -1,0 +1,88 @@
+{
+  "run_id": "bt-BTCTMN-20261022T183724Z-2463ba",
+  "mode": "backtest",
+  "created_at": "2026-10-22T18:37:24.877891+00:00",
+  "config_sha256": "05a65e8c51d9f0452f1cef55c3b163c70ad0c9b32e4af7e23f0fb53b960a6cd8",
+  "git_commit": null,
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "config": {
+    "app": {
+      "environment": "local",
+      "timezone": "Asia/Tehran",
+      "data_dir": "data",
+      "logs_dir": "logs",
+      "reports_dir": "reports"
+    },
+    "challenge": {
+      "allowed_markets": [
+        "BTCTMN",
+        "ETHTMN",
+        "USDTTMN"
+      ],
+      "starts_at": null,
+      "ends_at": null,
+      "initial_capital_tmn": "5000000"
+    },
+    "exchange": {
+      "rest_url": "https://api.wallex.ir",
+      "websocket_url": "wss://api.wallex.ir/ws",
+      "request_timeout_seconds": 10.0,
+      "max_retries": 3
+    },
+    "strategy": {
+      "signal_timeframe_minutes": 5,
+      "trend_timeframe_minutes": 60,
+      "max_spread_bps": "25",
+      "volume_z_min": "0",
+      "safety_factor": "1.5",
+      "stop_atr": "1.5",
+      "trend_target_r": "2",
+      "time_stop_bars": 12
+    },
+    "risk": {
+      "risk_per_trade": "0.01",
+      "max_symbol_exposure": "0.20",
+      "max_total_exposure": "0.60",
+      "min_tmn_reserve": "0.40",
+      "max_positions": 3,
+      "min_hold_minutes": 10,
+      "cooldown_minutes": 15,
+      "loss_cooldown_minutes": 60,
+      "daily_loss_stop": "0.03",
+      "halve_size_drawdown": "0.06",
+      "kill_switch_drawdown": "0.10"
+    },
+    "execution": {
+      "entry_timeout_seconds": 20,
+      "max_reprice_attempts": 2,
+      "modeled_slippage_bps": "8",
+      "reconcile_interval_seconds": 60,
+      "canary": true,
+      "canary_max_positions": 1,
+      "canary_symbol_exposure": "0.05",
+      "canary_total_exposure": "0.15",
+      "canary_risk_per_trade": "0.0025"
+    },
+    "ai": {
+      "enabled": false,
+      "provider": "boxapi",
+      "model": "openai/gpt-6-luna",
+      "base_url": "https://ai.boxapi.ir/ai/v1",
+      "timeout_seconds": 12.0,
+      "temperature": 0.0,
+      "seed": 42,
+      "prompt_version": "regime-v1",
+      "schema_version": "decisions-v1",
+      "fallback_size_multiplier": "0.50"
+    },
+    "backtest": {
+      "start": "2026-10-15T00:00:00+03:30",
+      "end": "2026-10-22T00:00:00+03:30",
+      "walk_forward_train_days": 60,
+      "walk_forward_test_days": 14
+    },
+    "dashboard": {
+      "refresh_seconds": 30
+    }
+  }
+}

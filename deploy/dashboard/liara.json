@@ -1,0 +1,8 @@
+{
+  "platform": "docker",
+  "port": 8501,
+  "healthCheck": {
+    "path": "/_stcore/health",
+    "port": 8501
+  }
+}
