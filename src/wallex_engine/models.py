@@ -243,6 +243,10 @@ class FeeSchedule(StrictModel):
     taker: Decimal = Field(ge=0)
 
 
+# Wallex /v1/account/fee for BTCTMN and ETHTMN, read on 2026-10-22.
+WALLEX_FEES = FeeSchedule(maker=Decimal("0.0025"), taker=Decimal("0.003"))
+
+
 class Balance(StrictModel):
     asset: str
     available: Decimal = Field(ge=0)

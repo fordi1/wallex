@@ -218,17 +218,30 @@ class WallexClient:
         return [
             Balance(
                 asset=str(_first(item, "asset", "symbol")).upper(),
-                available=_decimal(_first(item, "free", "available", default=0)),
+                available=_available(item),
                 locked=_decimal(_first(item, "locked", "freeze", default=0)),
             )
             for item in items or []
         ]
 
-    async def get_fees(self) -> FeeSchedule:
+    async def get_fees(self, symbol: str | None = None) -> FeeSchedule:
         payload = await self._request("GET", "/v1/account/fee", private=True)
         raw = _unwrap(payload, "result")
         if isinstance(raw, list):
             raw = raw[0] if raw else {}
+        per_symbol = {
+            key.upper(): value
+            for key, value in raw.items()
+            if isinstance(value, Mapping) and "makerFeeRate" in value
+        }
+        if per_symbol:
+            # Wallex returns one fee entry per market; unknown symbols get the worst rate.
+            rows = [per_symbol[symbol.upper()]] if symbol and symbol.upper() in per_symbol else []
+            rows = rows or list(per_symbol.values())
+            return FeeSchedule(
+                maker=max(_rate(row["makerFeeRate"]) for row in rows),
+                taker=max(_rate(row["takerFeeRate"]) for row in rows),
+            )
         return FeeSchedule(
             maker=_rate(_first(raw, "makerFeeRate", "maker", "makerFee")),
             taker=_rate(_first(raw, "takerFeeRate", "taker", "takerFee")),
@@ -377,6 +390,15 @@ def _precision_quantum(data: Mapping[str, Any], *keys: str) -> Decimal:
     if precision != precision.to_integral_value() or not Decimal(0) <= precision <= 18:
         raise ValueError(f"invalid precision {keys[0]}")
     return Decimal(1).scaleb(-int(precision))
+
+
+def _available(item: Mapping[str, Any]) -> Decimal:
+    explicit = _first(item, "free", "available", default=None)
+    if explicit is not None:
+        return _decimal(explicit)
+    # Wallex balances report the total as "value"; the free part excludes "locked".
+    total = _decimal(_first(item, "value", default=0))
+    return max(Decimal("0"), total - _decimal(_first(item, "locked", "freeze", default=0)))
 
 
 def _rate(value: Any) -> Decimal:

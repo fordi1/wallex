@@ -5,7 +5,6 @@ import asyncio
 import os
 import sys
 from datetime import UTC, datetime
-from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -24,7 +23,7 @@ from wallex_engine.config import RuntimeSecrets, load_config, redact_secrets  # 
 from wallex_engine.data.market_data import ParquetCandleStore, WallexMarketDataSource  # noqa: E402
 from wallex_engine.errors import ConfigurationError, EngineError  # noqa: E402
 from wallex_engine.exchange.wallex_client import WallexClient  # noqa: E402
-from wallex_engine.models import FeeSchedule  # noqa: E402
+from wallex_engine.models import WALLEX_FEES  # noqa: E402
 from wallex_engine.reporting.generator import (  # noqa: E402
     generate_backtest_report,
     generate_database_report,
@@ -116,7 +115,7 @@ async def run_backtest(config_path: str) -> None:
                     spec,
                     candles_5m,
                     candles_1h,
-                    FeeSchedule(maker=Decimal("0.002"), taker=Decimal("0.002")),
+                    WALLEX_FEES,
                 )
                 generate_backtest_report(
                     baseline_result,
@@ -128,7 +127,7 @@ async def run_backtest(config_path: str) -> None:
                 spec,
                 candles_5m,
                 candles_1h,
-                FeeSchedule(maker=Decimal("0.002"), taker=Decimal("0.002")),
+                WALLEX_FEES,
             )
             if ai_comparison_enabled:
                 comparison = _ai_comparison(

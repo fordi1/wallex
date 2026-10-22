@@ -15,6 +15,7 @@ from ..execution.brokers import LiveBroker, ShadowBroker, client_order_id, quant
 from ..features.indicators import feature_snapshots
 from ..lifecycle import flatten_plan
 from ..models import (
+    WALLEX_FEES,
     DecisionRecord,
     EquitySnapshot,
     MarketSpec,
@@ -92,7 +93,7 @@ class TradingRuntime:
             config.app.timezone,
         )
         self.broker: Broker = (
-            LiveBroker(client, store) if mode == "live" else ShadowBroker(store, Decimal("0.002"))
+            LiveBroker(client, store) if mode == "live" else ShadowBroker(store, WALLEX_FEES.taker)
         )
         self._shadow_cash = config.challenge.initial_capital_tmn
         self.run_id = f"{mode}-{datetime.now(tz=UTC):%Y%m%dT%H%M%SZ}-{uuid4().hex[:8]}"
@@ -163,8 +164,12 @@ class TradingRuntime:
         await self.store.set_service_state(
             "flatten_seconds_remaining", str(plan.seconds_remaining)
         )
-        fees = await self.client.get_fees() if self.mode == "live" else None
-        fee_rate = fees.maker if fees else Decimal("0.002")
+        if self.mode == "live":
+            markets = self.config.challenge.allowed_markets
+            schedules = [await self.client.get_fees(symbol) for symbol in markets]
+            fee_rate = max(schedule.maker for schedule in schedules)
+        else:
+            fee_rate = WALLEX_FEES.maker
         cash = await self._cash_tmn()
         equity, position_value = await self._equity(cash, positions)
         transitions = self.risk.update_equity(equity, now)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -54,3 +55,50 @@ async def test_book_refresh_is_bounded(monkeypatch) -> None:
         assert await client._bounded_book_refresh("BTCTMN") is None
     finally:
         await client.close()
+
+
+async def _client_returning(monkeypatch, payload) -> WallexClient:
+    client = WallexClient("https://example.test", "wss://example.test", "test-key")
+
+    async def request(method, path, **kwargs):
+        return payload
+
+    monkeypatch.setattr(client, "_request", request)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_balances_use_value_minus_locked(monkeypatch) -> None:
+    payload = {
+        "result": {
+            "balances": {
+                "TMN": {"asset": "TMN", "value": "5000000", "locked": "250000"},
+                "BTC": {"asset": "BTC", "value": "0", "locked": "0"},
+            }
+        }
+    }
+    client = await _client_returning(monkeypatch, payload)
+    try:
+        balances = {b.asset: b for b in await client.get_balances()}
+    finally:
+        await client.close()
+    assert balances["TMN"].available == Decimal("4750000")
+    assert balances["TMN"].locked == Decimal("250000")
+
+
+@pytest.mark.asyncio
+async def test_fees_are_per_symbol_with_conservative_fallback(monkeypatch) -> None:
+    payload = {
+        "result": {
+            "BTCTMN": {"makerFeeRate": "0.00250000", "takerFeeRate": "0.00300000"},
+            "XYZTMN": {"makerFeeRate": "0.00400000", "takerFeeRate": "0.00500000"},
+        }
+    }
+    client = await _client_returning(monkeypatch, payload)
+    try:
+        btc = await client.get_fees("BTCTMN")
+        worst = await client.get_fees()
+    finally:
+        await client.close()
+    assert (btc.maker, btc.taker) == (Decimal("0.0025"), Decimal("0.003"))
+    assert (worst.maker, worst.taker) == (Decimal("0.004"), Decimal("0.005"))

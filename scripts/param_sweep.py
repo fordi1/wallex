@@ -27,7 +27,7 @@ from wallex_engine.backtest.engine import BacktestEngine  # noqa: E402
 from wallex_engine.config import load_config  # noqa: E402
 from wallex_engine.data.market_data import ParquetCandleStore, resample_completed  # noqa: E402
 from wallex_engine.exchange.wallex_client import WallexClient  # noqa: E402
-from wallex_engine.models import FeeSchedule  # noqa: E402
+from wallex_engine.models import WALLEX_FEES  # noqa: E402
 from wallex_engine.reporting.generator import performance_metrics  # noqa: E402
 from wallex_engine.storage.database import SqlEventStore  # noqa: E402
 
@@ -36,7 +36,7 @@ DEFAULT_GRID = {
     "stop_atr": [Decimal("1.5")],
     "trend_target_r": [Decimal("2"), Decimal("3")],
 }
-FEES = FeeSchedule(maker=Decimal("0.002"), taker=Decimal("0.002"))
+FEES = WALLEX_FEES
 
 
 async def evaluate(config, store, spec, minute, hourly, split) -> dict[str, float]:
