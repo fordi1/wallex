@@ -7,9 +7,9 @@ app:
 
 challenge:
   # Provisional: replace with the official Wallex challenge allowlist before shadow/live.
-  allowed_markets: [BTCTMN, ETHTMN, USDTTMN]
-  starts_at: null
-  ends_at: null
+  allowed_markets: [BTCTMN, ETHTMN]
+  starts_at: "2026-10-22T23:20:00+03:30"  # 24h window stated by the team
+  ends_at: "2026-10-23T23:20:00+03:30"
   initial_capital_tmn: "5000000"
 
 exchange:
@@ -19,11 +19,11 @@ exchange:
   max_retries: 3
 
 strategy:
-  signal_timeframe_minutes: 5
+  signal_timeframe_minutes: 15  # walk-forward winner, reports/sweep_15m.json
   trend_timeframe_minutes: 60
   max_spread_bps: "25"
   volume_z_min: "0"
-  safety_factor: "1.5"
+  safety_factor: "1.25"
   stop_atr: "1.5"
   trend_target_r: "3"  # best in-sample in reports/param_sweep.json
   time_stop_bars: 12
@@ -68,6 +68,10 @@ ai:
 backtest:
   start: "2026-10-15T00:00:00+03:30"
   end: "2026-10-22T00:00:00+03:30"
+  # Median top-of-book spread measured from Wallex /v1/depth on 2026-10-22.
+  spread_bps:
+    BTCTMN: "8"
+    ETHTMN: "33"
   walk_forward_train_days: 60
   walk_forward_test_days: 14
 

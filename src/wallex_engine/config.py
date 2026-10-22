@@ -97,6 +97,11 @@ class AISection(BaseModel):
 class BacktestSection(BaseModel):
     start: datetime | None = None
     end: datetime | None = None
+    # Measured top-of-book spread per symbol; missing symbols use strategy.max_spread_bps.
+    spread_bps: dict[str, Decimal] = Field(default_factory=dict)
+
+    def spread_for(self, symbol: str) -> Decimal | None:
+        return {k.upper(): v for k, v in self.spread_bps.items()}.get(symbol.upper())
     walk_forward_train_days: int = 60
     walk_forward_test_days: int = 14
 
@@ -116,6 +121,10 @@ class AppConfig(BaseModel):
     ai: AISection = Field(default_factory=AISection)
     backtest: BacktestSection = Field(default_factory=BacktestSection)
     dashboard: DashboardSection = Field(default_factory=DashboardSection)
+
+    def modeled_spread_bps(self, symbol: str) -> Decimal:
+        measured = self.backtest.spread_for(symbol)
+        return self.strategy.max_spread_bps if measured is None else measured
 
     def require_challenge_ready(self, mode: str) -> None:
         missing: list[str] = []

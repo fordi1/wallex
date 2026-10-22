@@ -36,3 +36,10 @@ def test_live_requires_every_readiness_gate(config, monkeypatch) -> None:
 def test_direct_api_is_not_a_config_secret(config) -> None:
     serialized = config.model_dump_json()
     assert "api_key" not in serialized.lower()
+
+
+def test_backtest_spread_is_per_symbol_with_conservative_default() -> None:
+    config = AppConfig.model_validate({"backtest": {"spread_bps": {"BTCTMN": "8"}}})
+    assert config.backtest.spread_for("btctmn") == 8
+    assert config.backtest.spread_for("ETHTMN") is None
+    assert config.modeled_spread_bps("ETHTMN") == config.strategy.max_spread_bps

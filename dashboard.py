@@ -27,6 +27,12 @@ from sqlalchemy import create_engine, text  # noqa: E402
 from wallex_engine.app import build_ai_service  # noqa: E402
 from wallex_engine.config import RuntimeSecrets, load_config  # noqa: E402
 from wallex_engine.models import MarketSpec, SignalAction  # noqa: E402
+from wallex_engine.reporting.results import (  # noqa: E402
+    decision_frame,
+    decision_summary,
+    load_sweeps,
+    parse_report_tables,
+)
 from wallex_engine.runtime.control import (  # noqa: E402
     EngineController,
     preflight,
@@ -41,6 +47,11 @@ from wallex_engine.ui.market_explorer import (  # noqa: E402
     fetch_market_view,
     fetch_watchlist_quotes,
 )
+
+# Local runs read .env directly; values already exported by the host win.
+for _key, _value in read_env_file(ROOT / ".env").items():
+    if _value:
+        os.environ.setdefault(_key, _value)
 
 PERSIAN_DIGITS = str.maketrans("0123456789.-", "۰۱۲۳۴۵۶۷۸۹٫−")
 TEHRAN = ZoneInfo("Asia/Tehran")
@@ -1059,7 +1070,7 @@ def render_engine_control(config) -> None:
         )
         return
     controller = EngineController(config.app.logs_dir, cwd=ROOT)
-    env = {**read_env_file(ROOT / ".env"), **os.environ}
+    env = {**os.environ, **read_env_file(ROOT / ".env")}
     running = controller.status()
     if running is not None:
         st.success(
@@ -1103,15 +1114,178 @@ def render_engine_control(config) -> None:
         st.code(tail(last_logs[-1]) or "…", language="text")
 
 
+OUTCOME_LABELS = {"filled": "اجرا شد", "skipped": "ورود نکرد", "rejected": "رد شد"}
+SWEEP_LABELS = {"sweep_15m": "۱۵ دقیقه", "sweep_5m": "۵ دقیقه", "param_sweep": "دور اول"}
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def load_decisions(path: str, modified: float) -> pd.DataFrame:
+    return decision_frame(Path(path))
+
+
+def _percent_points(value: object) -> str:
+    return f"{format_number(value, 3)}٪"
+
+
+def render_ai_comparison(config) -> None:
+    st.subheader("اثر هوش مصنوعی: روشن در برابر خاموش")
+    reports = []
+    for path in sorted(Path(config.app.reports_dir).glob("bt-*.md"), reverse=True):
+        if path.stem.endswith("-ai-off"):
+            continue
+        metrics, comparison = parse_report_tables(path)
+        if comparison:
+            reports.append((path, metrics, comparison))
+    if not reports:
+        st.info("هنوز بک‌تست با AI روشن کامل نشده است. پس از اجرای بک‌تست، این بخش پر می‌شود.")
+        return
+    labels = {str(path): path.stem.split("-")[1] for path, _, _ in reports}
+    chosen = st.selectbox("بازار", list(labels), format_func=labels.get, key="ai_report")
+    _, metrics, comparison = next(r for r in reports if str(r[0]) == chosen)
+    first = st.columns(2)
+    first[0].metric("بازده AI روشن", format_percent(comparison.get("بازده AI روشن")))
+    first[1].metric("بازده AI خاموش", format_percent(comparison.get("بازده AI خاموش")))
+    second = st.columns(2)
+    second[0].metric("افت سرمایه AI روشن", format_percent(comparison.get("افت سرمایه AI روشن")))
+    second[1].metric("افت سرمایه AI خاموش", format_percent(comparison.get("افت سرمایه AI خاموش")))
+    third = st.columns(2)
+    third[0].metric("اختلاف سود تحقق‌یافته", format_money(comparison.get("اختلاف سود تحقق‌یافته")))
+    third[1].metric("اختلاف تعداد معاملات", format_number(comparison.get("اختلاف تعداد معاملات")))
+    st.caption(
+        f"معاملات با AI روشن: {format_number(metrics.get('تعداد معاملات'))} · "
+        f"مسیرهای جایگزین AI: {format_number(metrics.get('تعداد مسیرهای جایگزین AI'))}"
+    )
+
+
+def render_walk_forward(config) -> None:
+    st.subheader("آزمون رو به جلو")
+    st.caption("پارامتر فقط روی بازه انتخاب رتبه‌بندی شد؛ بازه آزمون دست‌نخورده گزارش می‌شود.")
+    sweeps = load_sweeps(config.app.reports_dir)
+    if not sweeps:
+        st.info("نتیجه‌ای از اسکریپت param_sweep پیدا نشد.")
+        return
+    name = st.radio(
+        "مجموعه آزمون",
+        sorted(sweeps, key=lambda key: list(SWEEP_LABELS).index(key) if key in SWEEP_LABELS else 99),
+        format_func=lambda key: SWEEP_LABELS.get(key, key),
+        horizontal=True,
+        key="sweep_set",
+    )
+    strategy = config.strategy
+    rows = []
+    for row in sweeps[name]:
+        current = (
+            int(row.get("signal_timeframe_minutes", 0)) == strategy.signal_timeframe_minutes
+            and "safety_factor" in row
+            and Decimal(str(row["safety_factor"])) == strategy.safety_factor
+            and Decimal(str(row.get("trend_target_r"))) == strategy.trend_target_r
+        )
+        trades_in = sum(v for k, v in row.items() if k.endswith("_in_trades"))
+        trades_out = sum(v for k, v in row.items() if k.endswith("_out_trades"))
+        rows.append(
+            {
+                "تنظیم فعلی": "✓" if current else "",
+                "تایم‌فریم": f"{format_number(row.get('signal_timeframe_minutes'))} دقیقه",
+                "ضریب اطمینان": format_number(row.get("safety_factor"), 2),
+                "هدف R": format_number(row.get("trend_target_r"), 1),
+                "بازده انتخاب": _percent_points(row.get("in_ret_sum")),
+                "بازده آزمون": _percent_points(row.get("out_ret_sum")),
+                "معاملات انتخاب": format_number(trades_in),
+                "معاملات آزمون": format_number(trades_out),
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+
+
+def render_decision_explorer(config) -> None:
+    st.subheader("کاوشگر تصمیم‌ها")
+    path = Path(config.app.logs_dir) / "decisions.jsonl"
+    if not path.exists():
+        st.info("لاگ تصمیم هنوز ساخته نشده است.")
+        return
+    frame = load_decisions(str(path), path.stat().st_mtime)
+    if frame.empty:
+        st.info("لاگ تصمیم خالی است.")
+        return
+    modes = [mode for mode in ("live", "shadow", "backtest") if mode in set(frame["mode"])]
+    mode = st.radio(
+        "حالت", modes, format_func=MODE_LABELS.get, horizontal=True, key="decision_mode"
+    )
+    view = frame[frame["mode"] == mode]
+    symbols = sorted(view["symbol"].dropna().unique())
+    symbol = st.selectbox("بازار", ["همه", *symbols], key="decision_symbol")
+    if symbol != "همه":
+        view = view[view["symbol"] == symbol]
+    only_signals = st.toggle("فقط سیگنال‌های ورود", value=mode == "backtest", key="decision_signals")
+    summary = decision_summary(view)
+    cards = st.columns(2)
+    cards[0].metric("تصمیم‌ها", format_number(summary["decisions"]))
+    cards[1].metric("سیگنال قواعد", format_number(summary["signals"]))
+    cards = st.columns(2)
+    cards[0].metric("رد توسط AI", format_number(summary["ai_vetoes"]))
+    cards[1].metric("اجرا شده", format_number(summary["filled"]))
+    if only_signals:
+        view = view[view["action"].fillna("SKIP") != "SKIP"]
+    view = view.sort_values("created_at", ascending=False).head(200)
+    if view.empty:
+        st.info("با این فیلتر تصمیمی وجود ندارد.")
+        return
+    table = pd.DataFrame(
+        {
+            "زمان": view["created_at"].map(format_datetime),
+            "بازار": view["symbol"],
+            "نتیجه": view["outcome"].map(lambda value: OUTCOME_LABELS.get(value, value)),
+            "رژیم AI": view["ai_regime"].fillna("—"),
+            "دلیل": view["reason_fa"],
+        }
+    )
+    st.dataframe(table, hide_index=True, width="stretch")
+    picked = st.selectbox(
+        "جزئیات تصمیم",
+        list(view.index),
+        format_func=lambda index: f"{format_datetime(view.at[index, 'created_at'])} · {view.at[index, 'symbol']}",
+        key="decision_detail",
+    )
+    row = view.loc[picked]
+    if (row["action"] or "SKIP") == "SKIP":
+        review = "بدون سیگنال"
+    else:
+        review = "تأیید" if row["ai_approve"] is not False else "رد"
+    st.markdown(
+        f"""
+- **قواعد:** {html.escape(str(row['signal_reason'] or '—'))}
+- **رژیم AI** (<bdi>{html.escape(str(row['ai_regime'] or '—'))}</bdi>، اطمینان {format_number(row['ai_confidence'], 2)}): {html.escape(str(row['ai_regime_reason'] or '—'))}
+- **بازبینی AI:** {review} — {html.escape(str(row['ai_review_reason'] or '—'))}
+- **ریسک:** {html.escape(str(row['risk_reason'] or '—'))}
+- **نتیجه:** {html.escape(str(row['reason_fa'] or '—'))}
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def render_results(config) -> None:
+    st.title("نتایج و شواهد")
+    st.caption("همه اعداد از گزارش‌ها و لاگ تصمیم همین مخزن خوانده می‌شوند.")
+    render_ai_comparison(config)
+    st.divider()
+    render_walk_forward(config)
+    st.divider()
+    render_decision_explorer(config)
+
+
 st.set_page_config(page_title="پایش Wallex", page_icon=":material/monitoring:", layout="wide")
 inject_theme()
 require_password()
 CONFIG = load_config(os.getenv("CONFIG_PATH", "config.yaml"))
 
-market_tab, operations_tab, control_tab = st.tabs(["بازار زنده", "عملیات موتور", "کنترل موتور"])
+market_tab, operations_tab, results_tab, control_tab = st.tabs(
+    ["بازار زنده", "عملیات موتور", "نتایج", "کنترل موتور"]
+)
 with market_tab:
     render_market_explorer(CONFIG)
 with operations_tab:
     render_dashboard(CONFIG)
+with results_tab:
+    render_results(CONFIG)
 with control_tab:
     render_engine_control(CONFIG)

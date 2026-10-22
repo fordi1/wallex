@@ -68,7 +68,7 @@ class BacktestEngine:
         fees: FeeSchedule,
     ) -> BacktestResult:
         books = {
-            c.opened_at: synthetic_book(c, self.config.strategy.max_spread_bps / 2)
+            c.opened_at: synthetic_book(c, self.config.modeled_spread_bps(market.symbol) / 2)
             for c in candles_5m
         }
         snapshots = feature_snapshots(

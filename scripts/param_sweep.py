@@ -4,6 +4,7 @@ Parameters are ranked on the in-sample window only; the out-of-sample window is
 reported untouched so the chosen configuration is not fitted to it.
 
     python scripts/param_sweep.py --config config.yaml --split 2026-10-19T00:00:00+03:30
+    python scripts/param_sweep.py --split ... --timeframes 5 --safety 1,1.25,1.5 --out s5.json
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from wallex_engine.models import FeeSchedule  # noqa: E402
 from wallex_engine.reporting.generator import performance_metrics  # noqa: E402
 from wallex_engine.storage.database import SqlEventStore  # noqa: E402
 
-GRID = {
+DEFAULT_GRID = {
     "signal_timeframe_minutes": [5, 15, 30],
     "stop_atr": [Decimal("1.5")],
     "trend_target_r": [Decimal("2"), Decimal("3")],
@@ -64,8 +65,18 @@ async def main() -> None:
     args = argparse.ArgumentParser()
     args.add_argument("--config", default="config.yaml")
     args.add_argument("--split", required=True)
+    args.add_argument("--timeframes", help="comma list, e.g. 5,15")
+    args.add_argument("--safety", help="comma list of safety_factor values, e.g. 1,1.25")
+    args.add_argument("--out", default="param_sweep.json")
     ns = args.parse_args()
+    grid = dict(DEFAULT_GRID)
+    if ns.timeframes:
+        grid["signal_timeframe_minutes"] = [int(v) for v in ns.timeframes.split(",")]
+    if ns.safety:
+        grid["safety_factor"] = [Decimal(v) for v in ns.safety.split(",")]
     base = load_config(ns.config)
+    if ns.safety:
+        grid["trend_target_r"] = [base.strategy.trend_target_r]
     split = datetime.fromisoformat(ns.split)
     start, end = base.backtest.start, base.backtest.end
     candles = ParquetCandleStore(base.app.data_dir / "candles")
@@ -76,8 +87,8 @@ async def main() -> None:
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         store = SqlEventStore(f"sqlite+aiosqlite:///{Path(tmp) / 'sweep.db'}", Path(tmp))
         await store.initialize()
-        for values in itertools.product(*GRID.values()):
-            params = dict(zip(GRID, values, strict=True))
+        for values in itertools.product(*grid.values()):
+            params = dict(zip(grid, values, strict=True))
             config = base.model_copy(
                 update={"strategy": base.strategy.model_copy(update=params)}
             )
@@ -96,8 +107,8 @@ async def main() -> None:
         await store.close()
     best = max(rows, key=lambda r: r["in_ret_sum"])
     print("BEST_IN_SAMPLE", json.dumps(best, default=str))
-    out = base.app.reports_dir / "param_sweep.json"
-    payload = {"split": ns.split, "rows": rows, "best": best}
+    out = base.app.reports_dir / ns.out
+    payload = {"split": ns.split, "grid": grid, "rows": rows, "best": best}
     out.write_text(json.dumps(payload, indent=2, default=str))
     print(f"Saved {out}")
 
