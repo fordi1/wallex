@@ -75,7 +75,13 @@ async def render(page_path: Path, out_mp4: Path, fps: int = 30, workers: int = 4
                  preview: list[float] | None = None) -> None:
     from playwright.async_api import async_playwright
     async with async_playwright() as p:
-        browser = await p.chromium.launch(executable_path=_chrome(), args=["--disable-gpu", "--font-render-hinting=none"])
+        chrome_exe = _chrome()
+        launch_args = {"args": ["--disable-gpu", "--font-render-hinting=none"]}
+        if chrome_exe:
+            launch_args["executable_path"] = chrome_exe
+        else:
+            launch_args["channel"] = "msedge"
+        browser = await p.chromium.launch(**launch_args)
         pg = await _open(browser, page_path)
         duration = await pg.evaluate("window.DURATION")
         cues = await pg.evaluate("window.CUES")
@@ -100,9 +106,22 @@ async def render(page_path: Path, out_mp4: Path, fps: int = 30, workers: int = 4
     video_only = BUILD / "video_only.mp4"
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy",
                     str(video_only)], check=True, cwd=BUILD)
-    wav = BUILD / "soundtrack.wav"
-    make_track(duration, cues, str(wav))
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_only), "-i", str(wav), "-c:v", "copy", "-c:a", "aac",
+    music_wav = BUILD / "music_only.wav"
+    make_track(duration, cues, str(music_wav))
+    voice_wav = BUILD / "voice_track.wav"
+    final_wav = BUILD / "soundtrack.wav"
+    if voice_wav.exists():
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", str(voice_wav),
+            "-i", str(music_wav),
+            "-filter_complex", "[0:a]volume=1.08[a0];[1:a]volume=0.18[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=2",
+            "-c:a", "pcm_s16le",
+            str(final_wav)
+        ], check=True)
+    else:
+        shutil.copy2(music_wav, final_wav)
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(video_only), "-i", str(final_wav), "-c:v", "copy", "-c:a", "aac",
                     "-b:a", "192k", "-shortest", "-movflags", "+faststart", str(out_mp4)], check=True)
     print("video:", out_mp4)
 

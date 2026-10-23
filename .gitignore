@@ -10,6 +10,7 @@ video/build/
 .pytest_cache/
 .ruff_cache/
 *.mp4
+!docs/video/*.mp4
 *.zip
 *.log
 data_zero/

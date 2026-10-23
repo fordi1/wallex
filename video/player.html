@@ -205,7 +205,11 @@ canvas.full{position:absolute;inset:0}
     <div class="h1" style="font-size:110px" id="o1">پیشرو</div>
     <div class="sub" style="font-size:38px;margin-top:14px;color:#fff" id="o2">جلوتر از بازار — همیشه با ترمز</div>
     <div class="row" style="margin-top:46px;gap:18px;justify-content:center;width:100%" id="o3"></div>
-    <div class="label mono" style="margin-top:46px;font-size:26px" id="o4">github.com/imrx44/wallex</div>
+    <div class="label mono" style="margin-top:46px;font-size:26px" id="o4">github.com/fordi1/wallex</div>
+  </div>
+
+  <div id="subtitles" style="position:absolute;bottom:78px;left:180px;right:180px;text-align:center;z-index:25;pointer-events:none;transition:opacity 0.2s ease;">
+    <span id="subText" style="display:inline-block;background:rgba(6,11,26,0.92);border:1px solid rgba(59,130,246,0.5);box-shadow:0 10px 30px rgba(0,0,0,0.8), 0 0 20px rgba(59,130,246,0.25);backdrop-filter:blur(10px);padding:10px 28px;border-radius:999px;font-size:25px;font-weight:700;color:#f8fafc;direction:rtl;letter-spacing:-0.2px;"></span>
   </div>
 
   <div id="chapters"></div>
@@ -610,6 +614,34 @@ $('o3').innerHTML = [['بازده', pct(D.return_pct, 2)], ['افت حداکثر
   .map((x, i) => `<div class="card" id="oc${i}" style="text-align:center;min-width:250px"><div class="label">${x[0]}</div><div style="font-size:32px;font-weight:800">${x[1]}</div></div>`).join('');
 cue(298 + .4, 'boom');
 
+const SUBTITLES = [
+  [1.5, 7.0, 'پیشرو — سامانه هوشمند معاملات الگوریتمی اسپات والکس'],
+  [7.0, 13.0, 'توسعه‌یافته برای چالش هکاتون Agentic AI استارکوچ با معماری هیبریدی'],
+  [13.5, 21.0, 'صورت مسئله: مدیریت ۵ میلیون تومان سرمایه اولیه، بدون دخالت دست طی ۳ روز'],
+  [21.0, 31.0, 'هدف: بیشترین بازده محقق‌شده با کمترین افت سرمایه و تصمیمات کاملاً شفاف'],
+  [31.5, 42.0, 'چرا بازگشت پریمیوم؟ شکار واگرایی قیمت ناشی از هیجانات موقت بازار داخلی'],
+  [42.0, 54.0, 'ارزش منصفانه: نرخ جهانی بایننس ضرب‌در قیمت لحظه‌ای تتر در والکس'],
+  [54.0, 66.0, 'استراتژی میکر: خرید در تخفیف‌های عمیق زیر پریمیوم عادی با کمترین کارمزد'],
+  [66.0, 78.0, 'خروج هوشمند: فروش در بازگشت به قیمت تعادلی با ذخیره قطعی سود'],
+  [78.5, 89.0, 'حل مشکل تاخیر: پایپ‌لاین ۲ ثانیه‌ای برای تحلیل مداوم ۲۲ نماد والکس'],
+  [89.0, 104.0, 'استقرار روی سرورهای ابری لیارا در ایران و کاهش پینگ به ۶۰ میلی‌ثانیه'],
+  [104.5, 118.0, 'هوش مصنوعی اول: مدل LightGBM کالیبره با سنجش لحظه‌ای ۱۷ متغیر ریزساختار'],
+  [118.0, 138.0, 'پیش‌بینی احتمال سوددهی خالص بعد از کارمزد و تنظیم پویا و بهینه حجم سفارش'],
+  [138.5, 154.0, 'هوش مصنوعی دوم: ایجنت خودمختار Claude Opus با ۱۱ ابزار تحلیلی زنده'],
+  [154.0, 176.0, 'مدیریت بحران و رصد اخبار با سقف‌های سخت‌گیرانه در کد — تضمین ایمنی ۱۰۰٪'],
+  [176.5, 190.0, 'مدیریت ریسک آهنین: مدارشکن افت ۶٪ برای توقف اضطراری و نقد کردن آنی حساب'],
+  [190.0, 207.0, 'سقف ریسک هر معامله تنها ۰.۸٪ و حفظ دائمی حداقل ۲۰٪ سرمایه نقد'],
+  [207.5, 220.0, 'نتایج Walk-Forward: نرخ برد ۸۹.۶٪ و فاکتور سود ۳.۷ روی داده‌های ندیده'],
+  [220.0, 236.0, 'بازدهی خالص +۴.۰۷٪ در ۵.۶ روز با نسبت شارپ روزانه ۱۴.۷ و افت تنها ۱.۷٪'],
+  [236.5, 245.0, 'شبیه‌سازی مونت‌کارلو: ۲۰٬۰۰۰ تکرار با شانس موفقیت بالای ۹۷٪'],
+  [245.0, 255.0, 'اثبات ریاضی پایداری استراتژی و عدم افت به مرز توقف در شرایط مختلف'],
+  [255.5, 264.0, 'تست زنده والکس: ثبت موفق سفارشات میکر در پامپ، آربیتروم و دوج'],
+  [264.0, 275.0, 'سرعت اجرا، کارمزد حداقلی و بازیابی خودکار ژورنال بدون کوچک‌ترین خطا'],
+  [275.5, 287.0, 'داشبورد فین‌تک بلومبرگ: شفافیت کامل تصمیمات، مانیتورینگ زنده و کنترل اضطراری'],
+  [287.5, 298.0, 'تکرارپذیری کامل: دیسک دائمی داده، دیپلوی کانتینری و گزارش‌گیری خودکار'],
+  [298.5, 306.0, 'پیشرو — جلوتر از بازار، همیشه با ترمز. آماده برای داوری چالش والکس'],
+];
+
 // ---------------------------------------------------------------- render(t)
 window.render = function (t) {
   drawBg(t);
@@ -635,6 +667,16 @@ window.render = function (t) {
   document.querySelectorAll('#chapters .c').forEach(c => { const a = +c.dataset.a, b = +c.dataset.b; const k = clamp((t - a) / (b - a));
     c.querySelector('i').style.width = (k * 100) + '%'; c.classList.toggle('on', t >= a && t < b); });
   $('chapters').style.opacity = t > 13 && t < 298 ? 1 : 0;
+
+  // Subtitles
+  const curSub = SUBTITLES.find(s => t >= s[0] && t < s[1]);
+  const subBox = $('subtitles');
+  if (curSub) {
+    $('subText').textContent = curSub[2];
+    subBox.style.opacity = '1';
+  } else {
+    subBox.style.opacity = '0';
+  }
 };
 window.READY = true;
 </script>
