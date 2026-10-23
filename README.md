@@ -2,18 +2,13 @@
 
 # 🚀 پیشرو (Pishro) — ربات هوشمند معاملات آربیتراژ و بازگشت پریمیوم والکس
 
-### 🎬 ویدیوی جامع معرفی سامانه، معماری و عملکرد زنده (۵ دقیقه با گویندگی و زیرنویس فارسی)
+### 🎬 ویدیوی جامع معرفی سامانه، معماری و عملکرد زنده (۵ دقیقه با زیرنویس تخصصی فارسی)
 
-<video src="https://github.com/fordi1/wallex/raw/main/docs/video/pishro_presentation.mp4" controls="controls" width="100%" poster="docs/images/dashboard_overview.png" style="max-width: 1000px; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.6);">
-  <a href="https://github.com/fordi1/wallex/raw/main/docs/video/pishro_presentation.mp4">
-    <img src="docs/images/dashboard_overview.png" width="100%" alt="مشاهده ویدیو معرفی پیشرو">
-  </a>
-</video>
+</div>
 
-https://github.com/fordi1/wallex/raw/main/docs/video/pishro_presentation.mp4
+https://github.com/user-attachments/assets/ae70a3d5-504c-47ab-a0db-517e57013f29
 
-> 💡 **پخش ویدیوی رسمی پیشرو:** کیفیت Full HD 1080p همراه با گویندگی فارسی استودیویی، زیرنویس تخصصی و موسیقی متن.  
-> 📥 [دانلود مستقیم ویدیو با کیفیت اصلی MP4](docs/video/pishro_presentation.mp4)
+<div align="center">
 
 [![Platform](https://img.shields.io/badge/Exchange-Wallex%20Spot-blue.svg)](https://wallex.ir)
 [![Reference](https://img.shields.io/badge/Reference-Binance%20Vision-yellow.svg)](https://binance.vision)

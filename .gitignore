@@ -7,6 +7,12 @@ data/
 data_demo/
 deliverables/*.db
 video/build/
+*.wav
+*.mp3
+upload_to_user_attachments.py
+assemble_voice.py
+bench_render.py
+test_preview.py
 .pytest_cache/
 .ruff_cache/
 *.mp4
