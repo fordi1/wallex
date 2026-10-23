@@ -1,279 +1,210 @@
-# Strategy, AI, Risk and Reproducibility
+# پیشرو — مستند فنی برای داوری
 
-This is the judging document requested by the Wallex challenge brief. Every
-claim below points at code or at a generated artifact that a judge can re-run.
+این سند بخش‌های خواسته‌شده در صورت چالش را پوشش می‌دهد: معماری و منطق الگوریتم، نحوه‌ی استفاده از هوش مصنوعی و ابزارهای والکس، شرایط خرید و فروش، مدیریت سرمایه و ریسک، و روش اجرای مجدد و ارزیابی.
 
-## 1. Architecture and main logic
+---
 
-One pipeline is shared by `backtest`, `shadow` and `live`; only the broker
-differs (see [ARCHITECTURE.md](ARCHITECTURE.md)).
+## ۱. ایده‌ی اصلی: بازگشت پریمیوم (Premium Reversion)
+
+قیمت هر کوین در بازار تومانی والکس از دو چیز ساخته می‌شود: **قیمت جهانی** آن کوین و **نرخ تتر به تومان**.
 
 ```
-Wallex REST/WebSocket -> candles (1m -> signal timeframe, plus 1h context)
-  -> features (EMA 9/21, hourly EMA 20/50, RSI 14, ATR 14, Bollinger, VWAP,
-               volume z-score, spread, 5-level book imbalance)
-  -> HybridStrategy (rules propose)        src/wallex_engine/strategy/hybrid.py
-  -> AI regime + signal review (AI disposes) src/wallex_engine/ai/providers.py
-  -> PortfolioRiskManager (hard limits)     src/wallex_engine/risk/manager.py
-  -> Broker: Backtest | Shadow | Live       src/wallex_engine/execution/brokers.py
-  -> SQL event store + logs/decisions.jsonl src/wallex_engine/storage/database.py
+قیمت منصفانه (fair) = قیمت <COIN>/USDT در بایننس × قیمت USDT/TMN در والکس
 ```
 
-## 2. Buy and sell conditions
+هیچ بازار تومانی دقیقاً روی fair معامله نمی‌شود. همیشه یک **پریمیوم** دارد (تقاضای محلی، اصطکاک ریال) که آهسته عوض می‌شود. ربات برای هر بازار این «پریمیوم عادی» را با میانگین متحرک نمایی (نیمه‌عمر ۳۰ دقیقه) یاد می‌گیرد و نوسانش را هم اندازه می‌گیرد.
 
-Spot, long-only, TMN-quoted markets. An entry needs **all** of:
+دفتر سفارش والکس کم‌عمق است. دو اتفاق مدام قیمت را **موقتاً** زیر پریمیوم عادی می‌برد:
 
-| Family | Entry rule |
-|---|---|
-| Trend | EMA9 crosses above EMA21 on the signal timeframe, hourly EMA20 > EMA50 and close > hourly EMA50, volume z-score > `volume_z_min` |
-| Mean reversion | Hourly EMAs within 1% (ranging), previous close below lower Bollinger and current close back inside, previous RSI <= 30, ATR/close <= 3% |
-| Both | Spread <= `max_spread_bps`, and **expected move > (round-trip fees + 2x slippage + spread) x `safety_factor`** |
+1. **فروشنده‌ی بزرگ محلی** که در دفتر کم‌عمق می‌فروشد و قیمت را پایین می‌کشد.
+2. **عقب‌ماندگی (lead-lag):** قیمت جهانی حرکت کرده ولی والکس هنوز دنبالش نیامده.
 
-The last line is the core economic filter: the Wallex account API reports a
-0.25% maker / 0.30% taker fee per side for BTCTMN and ETHTMN, so a trade must
-clear roughly 0.6-1% of modeled cost before it is allowed. This is why
-the signal timeframe is chosen by the walk-forward check in section 6 rather
-than by hand.
+هر دو برمی‌گردند، چون آربیتراژگرها و خریداران بعدی قیمت را به `fair × (1 + پریمیوم عادی)` برمی‌گردانند. ربات دقیقاً همین شکاف را می‌خرد و در بازگشت می‌فروشد. **این پیش‌بینی جهت بازار نیست.** مرجع، قیمت جهانی است و ربات فقط از ناکارآمدی ساختاری دفتر محلی سود می‌برد. برای همین با سقوط یا رشد کلی بازار نسبتاً بی‌ارتباط است.
 
-Exits (first that fires): ATR stop (`stop_atr` x ATR), trailing stop, target
-(`trend_target_r` x risk, or Bollinger mid for mean reversion), time stop
-(`time_stop_bars`). At challenge end every position is flattened to TMN so the
-result is **realized in Toman**, as the brief requires.
+## ۲. معماری
 
-## 3. Real use of AI (not a label on if/else)
+```
+ Wallex /v1/markets (همه بازارها، هر ۲ث)  ─┐
+ Wallex WebSocket (عمق + معاملات)         ─┤
+ Binance bookTicker (binance.vision)       ─┼─► LiveMarket ─► PremiumState (کندل ۱ دقیقه‌ای، مشترک با بک‌تست)
+ Nobitex orderbook (کنترل صحت)             ─┘                     │
+                                                                  ▼
+             مدل LightGBM کالیبره ──► ReversionEngine ◄── سیاست ایجنت Claude (ابزارها)
+                                                │                    ▲
+                                       RiskManager (قوانین سخت)      │ هر ۲۰ دقیقه + رویدادها
+                                                │                    │
+                                     LiveBroker (Wallex API) / PaperBroker (سایه)
+                                                │
+                     decisions.jsonl + SQLite + داشبورد + اعلان (بله/تلگرام)
+```
 
-The rules only *propose*. A language model (BoxAPI / Liara / OpenAI,
-`ai.provider` in `config.yaml`) makes two structured decisions per candidate,
-validated by strict Pydantic schemas:
+- همه‌چیز در یک پروسه‌ی `asyncio` است و در یک کانتینر روی لیارا اجرا می‌شود.
+- **کد استراتژی (`pishro/strategy/reversion.py`) بین ربات زنده و بک‌تست مشترک است.** هر عددی که ربات زنده با آن تصمیم می‌گیرد، در بک‌تست هم دقیقاً همان‌طور حساب می‌شود.
+- در شروع، ربات ۳ روز تاریخچه‌ی دقیقه‌ای (UDF والکس + kline بایننس) را دوباره پخش می‌کند تا آمار از دقیقه‌ی اول آماده باشد.
 
-1. **Regime** (`RegimeDecision`): classifies the market from the feature
-   snapshot, may block all entries and sets a size multiplier 0..1.
-2. **Signal review** (`ReviewDecision`): approves or vetoes the specific trade
-   and may shrink its size 0..1, with a Persian reason that is logged.
+## ۳. شرایط خرید
 
-The AI can only reduce risk, never enlarge a position or bypass a limit.
-Calls are deterministic (`temperature: 0`, `seed: 42`, versioned prompt and
-schema) and cached by input hash in `data/ai-cache/`, so a re-run replays the
-same answers. After 3 consecutive AI failures new entries pause; a single
-failure falls back to the rules at `fallback_size_multiplier` (0.5).
+برای هر بازار تومانی مجاز (همه‌ی بازارهای والکس منهای فهرست غیرفعال حساب اعتباری در `config/excluded_markets.txt`، با حجم روزانه‌ی کافی و اسپرد معقول):
 
-**Measured impact:** `python main.py backtest` runs every market twice, AI on
-and AI off, and writes the difference in return, drawdown, realized PnL and
-trade count into the report. This is the evidence that the AI changes decisions.
+1. **گیت‌ها** (اگر یکی برقرار باشد، ورود ممنوع است):
+   - `warmup`: آمار کافی نیست.
+   - `shock_ref`: بایننس در ۵ دقیقه بیش از ۰.۵٪ افتاده است (چاقوی در حال سقوط).
+   - `shock_usdt`: تتر در ۵ دقیقه بیش از ۰.۳٪ جهیده است.
+   - `regime`: نوسان پریمیوم ۶ ساعت اخیر بیش از ۲.۲ برابر بلندمدت است (رفتار بازار عوض شده).
+   - `refs_disagree`: مرجع‌های مستقل (بایننس، بازار تتری والکس، نوبیتکس) بیش از ۱.۲٪ اختلاف دارند.
+   - اسپرد بیش از حد، یا دوره‌ی استراحت بعد از ضرر.
+2. **لبه (edge):** حداقل عمق تخفیف لازم:
+   ```
+   edge = max( کف وابسته به کارمزد , 2.5 × نوسان پریمیوم ) × ضریب ایجنت
+   کف = 0.4%   اگر کارمزد صفر باشد
+   کف = 1.6 × (کارمزد خرید + فروش) + 0.1%   اگر کارمزد داشته باشیم
+   سطح خرید = fair × (1 + پریمیوم عادی) × (1 − edge)
+   ```
+3. **مدل ML:** احتمال کالیبره‌شده‌ی «این معامله بعد از کارمزد سود می‌دهد».
+   - اگر `p < 0.55` باشد، معامله رد می‌شود.
+   - اندازه با احتمال تنظیم می‌شود: ۵۰٪ اندازه در `p=0.55` و ۱۰۰٪ در `p≥0.72`.
+4. **رتبه‌بندی:** `امتیاز = p × edge`.
+   - ۴ بازار برتر سفارش خرید **منتظر (میکر)** در سطح خرید می‌گیرند. با هر جابه‌جایی ۰.۰۵٪ قیمت یا هر ۴۵ ثانیه، سفارش دوباره قیمت‌گذاری می‌شود.
+   - بقیه‌ی بازارها **اسنایپر** دارند: اگر بهترین قیمت فروش همین حالا زیر سطح (با کارمزد تیکر) باشد، خرید فوری انجام می‌شود.
+5. **ریسک:** قبل از هر سفارش، `RiskManager.check_open` همه‌ی سقف‌های بخش ۶ را چک می‌کند.
 
-## 4. Capital and risk management
+## ۴. شرایط فروش
 
-All limits live in `config.yaml` -> `risk` / `execution` and are enforced in
-`PortfolioRiskManager` before any order is created:
-
-- Never all-in: at least 40% of equity stays in TMN, max 60% total exposure,
-  max 20% per symbol, max 3 positions.
-- Risk per trade 1% of equity, sized from the ATR stop distance.
-- Daily loss stop 3% (Tehran day); size is halved at 6% drawdown; a persistent
-  kill switch stops trading at 10% drawdown.
-- Cooldowns (15 min, 60 min after a loss), minimum hold, no opposing orders.
-- Canary mode for the first live phase: 1 position, 5% per symbol, 0.25% risk.
-- Durable order intents with deterministic client IDs, partial-fill handling
-  and reconciliation every 60 s keep execution correct after restarts.
-
-## 5. Decision log (required deliverable)
-
-Every evaluated bar, traded or not, appends one JSON line to
-`logs/decisions.jsonl` (and the `decisions` SQL table) containing the full
-feature snapshot, the rule signal, the AI regime/review result, the risk
-decision, the final outcome and a Persian `reason_fa`. Every AI call is stored
-separately with its input hash. Manual trades are therefore distinguishable:
-an order without a matching decision line was not placed by the algorithm.
-
-## 6. Testing: backtest, walk-forward and shadow
-
-| Test | Command | Output |
+| حالت | شرط | نوع سفارش |
 |---|---|---|
-| Unit tests | `python -m pytest` | 45 tests |
-| Backtest (real Wallex history, AI on vs off) | `python main.py backtest` | `reports/bt-*.md/.html`, `logs/decisions.jsonl` |
-| Walk-forward parameter check (offline) | `python scripts/param_sweep.py --split <iso>` | `reports/param_sweep.json` |
-| Shadow (live data, no orders) | `python main.py shadow` | decisions + simulated fills in the event store |
-| Shadow gate before live | `python scripts/verify_shadow_gate.py` | pass/fail |
+| هدف | بازگشت به `fair × (1 + پریمیوم عادی) × (1 + exit_edge)`، **هرگز کمتر از سربه‌سر + کارمزد + ۰.۱٪** | لیمیت منتظر، با دنبال کردن fair |
+| حد ضرر | قیمت خرید (bid) به ۲.۵٪ زیر قیمت ورود برسد | فروش فوری روی bid |
+| زمان | پوزیشن بیش از ۲۴۰ دقیقه برنگردد | فروش فوری |
+| پایان چالش | ۴۵ دقیقه مانده به پایان (ورود جدید از ۲ ساعت مانده ممنوع است) | تبدیل همه به تومان |
+| توقف ریسک | افت از سقف یا ضرر روزانه | تبدیل همه به تومان |
 
-Backtest realism: completed candles only, fees 0.2% per side, 8 bps slippage
-each way, and a pessimistic synthetic spread equal to `max_spread_bps`.
-Minutes with no Wallex trades are filled as flat zero-volume bars; gaps longer
-than 60 minutes are treated as an outage and the run fails closed.
+بعد از حد ضرر، آن بازار ۳۰ دقیقه کنار گذاشته می‌شود. بازده چالش با تومان سنجیده می‌شود، پس **ربات هیچ کوینی را تا پایان نگه نمی‌دارد.** سود همیشه محقق‌شده است.
 
-### Final configuration (real fees and spreads)
+## ۵. نقش هوش مصنوعی (فراتر از if/else)
 
-Measured on 2026-10-22: fees from `/v1/account/fee` (maker 0.25%, taker 0.30%),
-top-of-book spreads from `/v1/depth` (BTCTMN ~7 bps, ETHTMN ~33 bps), stored as
-`backtest.spread_bps`. Same window and split as below.
-Source: `reports/sweep_15m_realfees.json`, `reports/sweep_15m.json`, `reports/sweep_5m.json`.
+### الف) مدل یادگیری ماشین: تصمیم روی هر سفارش
+- **مدل:** LightGBM با ۱۷ ویژگی.
+  - عمق تخفیف، نوسان پریمیوم، تغییر رژیم، پریمیوم عادی و فاصله‌ی فعلی.
+  - حرکت ۵، ۱۵ و ۶۰ دقیقه‌ای بایننس، والکس و تتر.
+  - حجم، نرخ برگشت افت‌های قبلی همان بازار، تعداد افت‌ها و ساعت روز.
+- **برچسب:** آیا معامله‌ای که ربات با همین قواعد می‌کرد، بعد از کارمزد سود داد؟ داده‌ها با شبیه‌سازی دقیق همان قواعد روی تاریخچه ساخته می‌شوند.
+- **آموزش:** تقسیم زمانی با فاصله‌ی ایمنی (embargo) برای جلوگیری از نشت اطلاعات. بعد کالیبراسیون isotonic تا احتمال واقعی باشد.
+- **کاربرد:** رد معامله‌های ضعیف، **تعیین اندازه‌ی سفارش**، و رتبه‌بندی بازارها برای سفارش منتظر.
+- **توضیح‌پذیری:** برای هر سفارش، سهم هر ویژگی (SHAP درونی LightGBM) به فارسی در لاگ ثبت می‌شود.
+- **یادگیری آنلاین:** هر ۱۲ ساعت مدل با داده‌ی تازه‌ی همان روزها دوباره آموزش می‌بیند. فقط اگر بهتر بود جایگزین می‌شود و این هم در لاگ ثبت می‌شود.
+- **دو مدل:** یکی برای حالت با کارمزد و یکی برای کارمزد صفر. با تشخیص خودکار کارمزد، مدل درست انتخاب می‌شود.
 
-| Signal TF | Safety factor | In-sample (BTC+ETH) | Out-of-sample | Trades | Max drawdown |
-|---|---|---|---|---|---|
-| 15m | 1.0 | +0.005% | +0.045% | 3 | 0.07% |
-| **15m** | **1.25** (chosen) | **+0.005%** | **+0.045%** | 3 | 0.07% |
-| 15m | 1.5 | -0.014% | 0.000% | 1 | 0.05% |
+### ب) ایجنت Claude Opus 5.5 با ابزار (Agentic AI)
+ایجنت هر ۲۰ دقیقه بیدار می‌شود. رویدادها هم بیدارش می‌کنند: پله‌های افت سرمایه، ضررهای پیاپی، توقف اضطراری، یا درخواست دستی. ایجنت با فراخوانی ابزار (function calling) کار می‌کند:
 
-With the earlier 0.2% fee assumption, 15m/1.25 was also the in-sample winner
-over 5m (1.0, 1.25, 1.5) and 15m (1.0, 1.5); lowering the safety factor added
-trades but they were net losers. ETHTMN never passed the cost filter because
-its spread alone is ~0.33%, which is the intended behaviour.
+- **ابزارهای خواندن:**
+  - `get_portfolio_status`، `get_market_overview`، `get_opportunities`
+  - `get_market_detail`، `get_recent_trades`، `get_news` (تیترهای خبری)، `get_backtest_summary`
+- **ابزارهای اقدام:**
+  - `set_risk_mode`: حالت normal، defensive یا halt_entries، به‌همراه ضرایب اندازه، لبه و هدف خروج.
+  - `set_market_policy`: مسدود یا مجاز کردن یک بازار و تنظیم اندازه و لبه‌ی آن.
+  - `reset_market_policy` و `finish` (خلاصه‌ی فارسی).
 
-### Why so few signals (bottleneck analysis, BTCTMN 15m, 652 decisions)
+ایجنت تعیین می‌کند **کجا و با چه شدتی** بازی شود. مثلاً بازاری را که افت‌هایش دیگر برنمی‌گردد یا خبر منفی دارد می‌بندد، یا در بازار پرنوسان محافظه‌کار می‌شود. مدل ML هم تک‌تک سفارش‌ها را امتیاز می‌دهد.
 
-| Condition | Share of bars where it held |
-|---|---|
-| EMA 9/21 cross on this bar | 2.1% |
-| Hourly EMA20 > EMA50 | 37% |
-| Close above hourly EMA50 | 46% |
-| Volume z-score > 0 | 37% |
-| Fee-adjusted edge | 76% |
+**محدودیت‌های ایجنت در کد** (`ai/policy.py`):
+- اندازه حداکثر ×۱ (نمی‌تواند از قوانین پایه بزرگ‌تر کند).
+- لبه حداقل ×۰.۸.
+- به حد ضرر و سقف‌های ریسک دسترسی ندارد.
+- اگر ایجنت جواب ندهد، سیاستش بعد از ۹۰ دقیقه منقضی می‌شود و ربات به حالت محافظه‌کار برمی‌گردد.
 
-The same-bar cross was the single blocker in 52 near misses, so a
-`cross_window_bars` setting (enter while the cross is at most N-1 bars old)
-was tested on the same split (`reports/sweep_cross.json`):
+هر بازبینی ایجنت با تمام فراخوانی‌های ابزار، نتایج و استدلال فارسی در دیتابیس و لاگ ثبت می‌شود.
 
-| Window | In-sample | Out-of-sample | Out-of-sample trades |
-|---|---|---|---|
-| **1** (kept) | +0.005% | **+0.045%** | 1 |
-| 3 | +0.005% | +0.020% | 2 |
-| 5 | +0.005% | +0.001% | 3 |
+### ج) روایت‌گر معاملات
+Claude برای هر معامله‌ی بسته‌شده یک توضیح کوتاه فارسی می‌نویسد (چرا خرید، چرا فروش، نتیجه) که در لاگ ثبت می‌شود.
 
-Later entries after the cross added trades but each one paid the full cost
-for less of the move, so the window stays at 1. Low frequency is the
-consequence of a ~0.55% round-trip cost, not a missing signal.
+### د) ابزارهای والکس و MCP
+- **Wallex API:**
+  - `markets`، `depth`، `udf/history`، `currencies/stats`
+  - `account/balances`، `account/fee`، `account/orders` (ثبت، وضعیت و لغو)، `openOrders`
+- **WebSocket والکس** برای عمق و معاملات بازارهایی که سفارش داریم.
+- **سرور MCP پیشرو** (`python -m pishro mcp`): ابزارهای ربات را به هر کلاینت MCP (Claude Desktop یا Claude Code) می‌دهد تا داور بتواند از یک دستیار AI بپرسد «چرا ربات ساعت ۱۴:۰۲ دوج خرید؟».
 
-### Indicator agreement (confluence) as an entry rule
+## ۶. مدیریت سرمایه و ریسک (در کد، بیرون از AI)
 
-Six indicators each vote bullish, bearish or neutral (EMA 9/21, hourly trend,
-VWAP, RSI, Bollinger middle, order-book imbalance). The tested rule entered
-when no vote was bearish and at least five were bullish, and exited when the
-mirror held (`reports/sweep_confluence.json`):
-
-| Confluence | In-sample | Out-of-sample | Trades | Max drawdown |
-|---|---|---|---|---|
-| **off** (kept) | +0.005% | **+0.045%** | 3 | 0.07% |
-| on | -0.010% | -0.269% | 11 | 0.32% |
-
-When every indicator already agrees, most of the move has happened, so the
-rule bought late and paid fees on more trades. The votes stay in the terminal
-as an at-a-glance explanation; the entry rule stays off.
-
-### AI on vs off (BTCTMN, live BoxAPI model, 15m)
-
-Source: `reports/bt-BTCTMN-20261022T194935Z-e15822.md` and its `-ai-off` twin.
-
-| | AI on | AI off |
+| قاعده | مقدار | کجا |
 |---|---|---|
-| Return | -0.004% | +0.046% |
-| Max drawdown | 0.035% | 0.059% |
-| Trades | 1 | 3 |
+| ریسک هر معامله (تا حد ضرر) | ۰.۸٪ سرمایه | `risk.risk_per_trade_pct` |
+| اندازه‌ی پایه‌ی هر پوزیشن | ۲۰٪ سرمایه × ضریب ML × ضریب ایجنت | `strategy.position_frac` |
+| حداکثر در یک بازار | ۲۵٪ | `risk.max_position_pct` |
+| حداکثر کل دارایی پرریسک | ۷۵٪ | `risk.max_total_exposure_pct` |
+| همیشه نقد | ۲۰٪ (هیچ‌وقت با کل پول وارد نمی‌شود) | `risk.min_cash_reserve_pct` |
+| حداکثر پوزیشن هم‌زمان | ۴ | `risk.max_open_positions` |
+| حجم سفارش | حداکثر ۳۰٪ ارزش ۳ سطح اول دفتر | `risk.max_book_participation` |
+| حد ضرر هر پوزیشن | ۲.۵٪ | `strategy.stop_pct` |
+| توقف روزانه | ضرر ۲.۵٪ در روز ← نقد کردن و توقف تا فردا | `risk.daily_loss_limit_pct` |
+| کلید توقف اضطراری | افت ۶٪ از سقف ← نقد کردن و توقف کامل | `risk.max_drawdown_pct` |
+| ضررهای پیاپی | ۳ ضرر ← ۴۵ دقیقه استراحت | `risk.max_consecutive_losses` |
+| داده‌ی کهنه | بیش از ۲۰ ثانیه ← لغو سفارش‌های خرید | `risk.stale_data_sec` |
+| خطای API | بیش از ۲۰ در دقیقه ← ورود ممنوع | `risk.max_api_errors_per_min` |
+| سرعت ثبت سفارش | حداکثر ۴ سفارش در ثانیه | `exchange.max_orders_per_sec` |
 
-The AI vetoed two rule signals and shrank one, each with a logged reason
-(for example: round-trip fee too large relative to the target while the hourly
-trend is down). In this week the two vetoed trades would have been small
-winners, so the AI lowered return slightly while lowering drawdown. With three
-trades this is within noise; the claim is that the AI has a real, measurable
-and auditable effect on decisions, not that it improves return.
+**جلوگیری از معامله با خود (self-trade) و wash trading:** ربات هیچ‌وقت هم‌زمان در یک بازار سفارش خرید و فروش باز ندارد. قبل از ثبت فروش، باقی‌مانده‌ی خرید لغو می‌شود. فقط یک حساب دارد و فقط وقتی معامله می‌کند که لبه‌ی واقعی وجود داشته باشد.
 
-### First round (0.2% fee and 25 bps spread assumptions)
+**کارمزد:** API کارمزد (`/v1/account/fee`) برای بازارهای تومانی ۰.۲۵٪ و ۰.۳٪ گزارش می‌دهد. ربات با همین عدد محتاطانه شروع می‌کند. با اولین فیل واقعی، کارمزد را از `fills[].fee` می‌خواند. اگر صفر بود (یا بازار `isZeroFee` داشت)، کارمزد، کف لبه و مدل ML را خودکار عوض می‌کند و در لاگ می‌نویسد.
 
-Real Wallex history, 2026-10-15 to 2026-10-22 (Tehran), BTCTMN and ETHTMN,
-AI off (deterministic baseline, no `BOX_API_KEY` in the test environment).
-Parameters were ranked on 10-15..10-19 only; 10-19..10-22 is out-of-sample.
-Source: `reports/param_sweep.json`, `reports/bt-*.md`, `reports/backtest-run.log`.
+**پایداری اجرا:**
+- اگر والکس در دسترس نباشد، ربات دوباره تلاش می‌کند و داشبورد بالا می‌ماند.
+- وب‌سوکت‌ها خودکار دوباره وصل می‌شوند.
+- بعد از ری‌استارت، پوزیشن‌ها از دیتابیس برمی‌گردند و کوین‌های بی‌صاحب حساب «پذیرفته» می‌شوند تا فروخته شوند.
+- هر ۶۰ ثانیه موجودی با حساب تطبیق داده می‌شود.
+- health check لیارا تعریف شده است.
 
-| Signal TF | Target R | In-sample return (BTC+ETH) | In-sample trades | Out-of-sample return | Out-of-sample trades |
-|---|---|---|---|---|---|
-| 5m | 2 | -0.033% | 1 | 0.000% | 0 |
-| **5m** | **3** | **-0.021%** (best) | 2 | 0.000% | 0 |
-| 15m | 2 | -0.087% | 2 | 0.000% | 0 |
-| 15m | 3 | -0.184% | 4 | 0.000% | 0 |
-| 30m | 2 | -0.069% | 2 | +0.038% | 1 |
-| 30m | 3 | -0.069% | 2 | +0.083% | 2 |
+## ۷. لاگ تصمیم‌ها (تحویلی)
 
-Honest reading:
+فایل `data/decisions.jsonl` (برای حالت سایه: `decisions_paper.jsonl`) برای هر رویداد یک خط JSON دارد:
 
-- Maximum drawdown in every configuration stayed below 0.2% of capital:
-  the risk layer works and capital is preserved.
-- The strategy is very selective. With ~0.2% fee per side, the cost filter
-  rejects most setups, so a week produces only 0-4 trades. Results are within
-  noise of zero; no configuration is claimed to be reliably profitable.
-- This first round fixed `trend_target_r: 3`; the timeframe and safety factor
-  were then re-selected above with measured fees and spreads. The 30m
-  variants did better out-of-sample here, but adopting them would be fitting to
-  the test window, so that is recorded rather than adopted.
-- USDTTMN was rejected by the data-quality gate (a 10-hour hole in Wallex
-  candle history on 2026-10-19), which is the intended fail-closed behaviour.
+- `buy_order`: سطح، fair، پریمیوم عادی، نوسان، لبه، احتمال ML، ۱۷ ویژگی، سیاست ایجنت، تأخیر ثبت سفارش و **دلیل فارسی**.
+- `buy_fill` و `sell_order`.
+- `sell_fill`: دلیل خروج، سود یا زیان، کارمزد واقعی.
+- `cancel_buy`، `agent_policy` (استدلال ایجنت و اقدام‌ها)، `fee_regime`، `model_retrained`، `trade_story`.
 
-### Live-safety fixes after the readiness audit (2026-10-23)
+هر سفارشی که در حساب ثبت شده، یک `client_id` دارد که در همین لاگ پیدا می‌شود. این ثابت می‌کند معامله‌ی دستی وجود ندارد.
 
-Each fix has a regression test; `reports/sweep_parity.json` shows the backtest
-is unchanged after moving trailing-stop logic into a shared function.
+خروجی‌ها با `python -m pishro export` در پوشه‌ی `deliverables/` جمع می‌شوند: لاگ، معاملات CSV، منحنی سرمایه و سفارش‌ها.
 
-| Audit finding | Fix |
-|---|---|
-| Shadow crashed on a Wallex `RemoteProtocolError` | Reads retry every transport error; the loop pauses with backoff and reports degraded health. Reconciliation drift still stops the engine. |
-| Order writes could be resent after a timeout | Writes are never retried blindly; the broker reconciles by client ID. |
-| `/v1/account/trades` raised `KeyError` | Parses the documented `AccountLatestTrades` list, `isBuyer` side and a stable content-derived fill id. |
-| `bars_held` / trailing stop never updated live | `_manage_position` advances bars and uses `trail_position()`, shared with the backtest. |
-| Stop exits were limit orders | Stop and trailing-stop exits are urgent and go at market, even inside the minimum hold. |
-| Canary limit could be broken across symbols | Positions and cash are re-read before each market in a cycle. |
-| Cancel/fill race | Orders are re-read after every cancel; partial fills become protected positions and nothing is re-bought or double-sold. |
+## ۸. بک‌تست و تست سایه
 
-Still open from the audit: a 24-hour continuous shadow run, PostgreSQL
-leader lock for live (SQLite has none; the terminal allows one engine process),
-restoring cooldown/peak state after restart, and Telegram alerts.
+### بک‌تست (`python -m pishro fetch && python -m pishro backtest`)
+- **داده:** ۳۰ روز کندل ۱ دقیقه‌ای والکس (حدود ۴۰ بازار پرحجم مجاز + USDT/TMN) و بایننس.
+- **شبیه‌ساز دقیقه‌ای پرتفوی** با همان `PremiumState`، قواعد، مدل ML و `RiskManager` ربات زنده.
+- **فرض‌های محتاطانه:**
+  - سفارش دقیقه‌ی t فقط با داده‌ی تا پایان دقیقه‌ی t−1 ساخته می‌شود.
+  - خرید منتظر فقط با عبور ۰.۰۵٪ قیمت و حجم کافی پر می‌شود.
+  - اسنایپر و حد ضرر با لغزش ۰.۰۸٪ اجرا می‌شوند.
+  - اگر حد ضرر و هدف در یک دقیقه لمس شوند، حد ضرر فرض می‌شود.
+  - رزرو پول سفارش‌های منتظر شبیه‌سازی می‌شود.
+- **Walk-forward:** مدل روی ۶۰٪ اول آموزش می‌بیند و روی ۴۰٪ بعد (ندیده) تست می‌شود: **«فقط قواعد» در برابر «قواعد + ML»**. این ثابت می‌کند AI واقعاً اثر دارد.
+- **دو سناریوی کارمزد:** ۰.۲۵٪/۰.۳٪ و صفر.
+- **مونت‌کارلوی ۳ روزه (طول چالش):** احتمال بازده مثبت و بازه‌ی ۵ تا ۹۵ درصد.
+- **خروجی:** `reports/backtest.html` (روی داشبورد در `/report`)، `reports/backtest.json`، CSV معاملات، و مدل‌های `models/*.pkl`.
 
-## 7. Re-running (for judges)
+### تست سایه (`PISHRO_MODE=paper python -m pishro serve`)
+- همان کد زنده با قیمت‌های واقعی والکس اجرا می‌شود، ولی سفارش‌ها به `PaperBroker` می‌روند.
+- مدل پر شدن محتاطانه است: سفارش منتظر فقط وقتی پر می‌شود که بازار از قیمتش عبور کند.
+- کارمزد خرید از کوین و کارمزد فروش از تومان کم می‌شود.
+- لاگ و داشبورد جدا دارد. می‌توان قبل و هم‌زمان با اجرای واقعی آن را مقایسه کرد.
 
-```powershell
-py -3.11 -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python -m pytest
-python main.py backtest --config config.yaml
-python scripts/param_sweep.py --split 2026-10-19T00:00:00+03:30
+### آزمون‌های خودکار (`pytest`)
+- تست واحد: پارسرهای API، قیمت منصفانه، گیت‌ها، لبه، سربه‌سر، ریسک، سقف‌های سیاست ایجنت، بروکر سایه، و حلقه‌ی ابزار ایجنت با مدل جعلی.
+- **تست سرتاسری:** ربات واقعی در حالت سایه، با والکس و بایننس شبیه‌سازی‌شده و ساعت مجازی، ۱۴ ساعت بازار را طی می‌کند. ثبت سفارش، فیل، فروش، لاگ دلیل، تطابق سود محقق‌شده با موجودی و **تبدیل همه به تومان در پایان** را بررسی می‌کند.
+
+## ۹. اجرای مجدد برای داوران
+
+```bash
+git clone <repo> && cd <repo>
+pip install -r requirements-dev.txt
+pytest -q                              # همه‌ی تست‌ها
+python -m pishro demo                  # کل مسیر بک‌تست/ML/گزارش بدون اینترنت (داده‌ی مصنوعی)
+python -m pishro check                 # از ایران: اتصال‌ها
+python -m pishro fetch && python -m pishro backtest   # بازتولید نتایج بک‌تست با داده‌ی واقعی
+PISHRO_MODE=paper python -m pishro serve              # تست سایه
 ```
 
-Set `BOX_API_KEY` to enable the AI comparison; without it the backtest runs the
-deterministic AI-off baseline and says so. Each run writes an immutable
-manifest of the exact configuration to `data/manifests/`.
-
-## 8. Operator control panel
-
-`streamlit run dashboard.py` -> tab "کنترل موتور" starts or stops exactly one
-engine process in backtest, shadow or live mode. It is disabled unless
-`DASHBOARD_CONTROL_ENABLED=true`. Before starting, it lists every gate that
-would refuse the mode (missing challenge times, API key, shadow approval, ...)
-and keeps the start button disabled; live also needs an explicit confirmation.
-The panel never places orders itself: it only runs `main.py <mode>`, so every
-trade still comes from the algorithm and has a decision-log line.
-Code: `src/wallex_engine/runtime/control.py`.
-
-### Trading terminal (`python terminal.py`)
-
-A TradingView-style page on 127.0.0.1 that makes every judging item visible:
-
-- **Signal analysis:** for any logged decision, every entry condition with its
-  measured value and threshold (EMA cross, hourly trend, volume, Bollinger
-  re-entry, RSI, volatility, spread, fee-adjusted edge), a count such as
-  "trend: 2 of 5 conditions failed", then the AI regime/review and the risk
-  constraints. `HybridStrategy.explain()` mirrors `evaluate()`; a property test
-  checks that their verdicts agree on 300 random market states.
-- **Risk and P&L:** each limit next to its current usage, per-trade rules,
-  open positions with stop/target, realized and unrealized P&L.
-- **Scorecard:** number of trades, volume, average trade size, net return,
-  max drawdown, fees, execution latency (intent to fill), errors, decisions,
-  AI vetoes and AI calls, each labelled with its rubric row.
-- Each mode writes its own SQLite file (`data/shadow.db`, `data/live.db`), so
-  simulated shadow positions can never be loaded by the live engine.
-
-## 9. Wallex tools
-
-Market data, balances, fees and orders use the official Wallex REST API and the
-raw `wss://api.wallex.ir/ws` stream through one narrow adapter,
-`src/wallex_engine/exchange/wallex_client.py`. The trading decision path does
-not depend on Wallex MCP: a long-running engine needs deterministic, testable
-calls with retries and idempotent client order IDs, which the REST adapter
-provides. Wallex MCP is suitable for an operator agent that inspects the
-account interactively.
+- **قابلیت بازتولید:** همه‌ی پارامترها در `config/config.yaml` هستند و با متغیر محیطی هم قابل تغییرند. LightGBM با seed ثابت و `deterministic=True` اجرا می‌شود. نسخه‌ی کتابخانه‌ها در `requirements.txt` ثابت شده است.
+- **با Docker:** `docker build -t pishro . && docker run -p 8000:8000 --env-file .env -v $PWD/data:/app/data pishro`

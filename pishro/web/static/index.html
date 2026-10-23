@@ -1,0 +1,1239 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>پیشرو — داشبورد معاملاتی هوشمند والکس</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --font-sans: 'Vazirmatn', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --bg-base: #090d16;
+  --bg-surface: #0f172a;
+  --bg-card: #131d35;
+  --bg-card-hover: #182442;
+  --border-subtle: #1e293b;
+  --border-card: #24324f;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-dim: #64748b;
+  --primary: #3b82f6;
+  --primary-glow: rgba(59, 130, 246, 0.25);
+  --accent: #8b5cf6;
+  --success: #10b981;
+  --success-bg: rgba(16, 185, 129, 0.12);
+  --success-border: rgba(16, 185, 129, 0.3);
+  --danger: #ef4444;
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --danger-border: rgba(239, 68, 68, 0.3);
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.12);
+  --info: #06b6d4;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="light"] {
+  --bg-base: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-card: #cbd5e1;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --text-dim: #94a3b8;
+  --primary: #2563eb;
+  --primary-glow: rgba(37, 99, 235, 0.15);
+  --shadow-card: 0 4px 16px -2px rgba(0, 0, 0, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg-base);
+  color: var(--text-main);
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-card); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* Header */
+header {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-card);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(12px);
+}
+.header-inner {
+  max-width: 1440px;
+  margin: auto;
+  padding: 10px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 1.2rem;
+  box-shadow: 0 0 15px var(--primary-glow);
+}
+.brand-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.badge-mode {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.badge-mode.live {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+}
+.badge-mode.paper {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(1.3); } }
+
+.header-status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+}
+
+.countdown-box {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  color: #c084fc;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 600;
+  direction: ltr;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-card);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+.btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--text-dim);
+}
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.btn-primary:hover {
+  background: #2563eb;
+  border-color: #2563eb;
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border-color: var(--danger-border);
+}
+.btn-danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+.btn-icon {
+  padding: 6px 8px;
+}
+
+/* Main Container */
+main {
+  max-width: 1440px;
+  margin: auto;
+  padding: 16px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Quick Ticker */
+.ticker-bar {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+}
+.ticker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.ticker-label { color: var(--text-dim); }
+.ticker-val { font-family: var(--font-mono); font-weight: 600; direction: ltr; }
+
+/* KPI Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.15s, border-color 0.15s;
+}
+.kpi-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+}
+.kpi-card.highlight::before {
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+}
+.kpi-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.kpi-title {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.kpi-icon {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+.kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  direction: ltr;
+  text-align: right;
+  letter-spacing: -0.02em;
+}
+.kpi-sub {
+  font-size: 0.73rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Colors */
+.pos { color: var(--success) !important; }
+.neg { color: var(--danger) !important; }
+.warn { color: var(--warning) !important; }
+
+/* Layout Grid */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 1024px) {
+  .dash-grid { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+}
+.panel-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.panel-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-body {
+  padding: 14px 18px;
+  flex: 1;
+}
+
+/* Charts */
+.chart-container {
+  width: 100%;
+  height: 240px;
+  position: relative;
+}
+svg.chart {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Table styling */
+.table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+table.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+}
+table.data-table th {
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.4);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-align: right;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+table.data-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+table.data-table tbody tr:hover td {
+  background: var(--bg-card-hover);
+}
+.market-tag {
+  font-weight: 700;
+  color: var(--text-main);
+  background: rgba(59, 130, 246, 0.1);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  display: inline-block;
+  direction: ltr;
+}
+
+/* Feed List */
+.feed-list {
+  max-height: 400px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+.feed-item {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  transition: border-color 0.15s;
+}
+.feed-item:hover { border-color: var(--primary); }
+.feed-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.feed-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+.feed-tag.buy_order, .feed-tag.buy_fill { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
+.feed-tag.sell_order, .feed-tag.sell_fill { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+.feed-tag.cancel_buy, .feed-tag.cancel_sell { background: var(--warning-bg); color: var(--warning); }
+.feed-tag.agent_review, .feed-tag.agent_policy { background: rgba(139, 92, 246, 0.15); color: #c084fc; }
+.feed-time { font-size: 0.72rem; color: var(--text-dim); direction: ltr; }
+.feed-text { font-size: 0.8rem; color: var(--text-main); line-height: 1.4; }
+
+/* Agent Card */
+.policy-box {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(59, 130, 246, 0.05));
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.policy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.policy-mode {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #c084fc;
+}
+.policy-multipliers {
+  display: flex;
+  gap: 12px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.policy-rationale {
+  font-size: 0.82rem;
+  color: var(--text-main);
+  line-height: 1.5;
+  border-right: 2px solid var(--accent);
+  padding-right: 8px;
+}
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.modal-backdrop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  max-width: 400px;
+  width: 100%;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+}
+.modal-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+.modal-desc { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 16px; }
+.modal-input {
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+.modal-input:focus { outline: none; border-color: var(--primary); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* Empty state */
+.empty-hint {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 30px 16px;
+  font-size: 0.85rem;
+}
+
+/* Toast */
+#toast-container {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-card);
+  color: var(--text-main);
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+  animation: slideIn 0.2s;
+}
+@keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-logo">P</div>
+      <div>
+        <div class="brand-title">
+          پیشرو <span style="font-weight:400;color:var(--text-dim);font-size:0.9rem">| Pishro Terminal</span>
+          <span id="modeBadge" class="badge-mode paper">
+            <span class="pulse-dot"></span>
+            <span id="modeText">...</span>
+          </span>
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-muted)" id="headerSubtitle">اتصال به هسته معاملاتی والکس...</div>
+      </div>
+    </div>
+
+    <div class="header-status">
+      <div class="status-pill" title="وضعیت ارتباط فید قیمت">
+        <span class="pulse-dot" style="background:#10b981;color:#10b981"></span>
+        <span>تأخیر داده: <b id="dataAge" style="direction:ltr;display:inline-block">—</b></span>
+      </div>
+      <div class="status-pill" title="تأخیر ارسال سفارش به والکس">
+        <span>پینگ سفارش: <b id="orderLatency" style="direction:ltr;display:inline-block">—</b></span>
+      </div>
+      <div class="countdown-box" id="challengeCountdown" title="زمان باقی‌مانده تا پایان مسابقه">
+        ⌛ --:--:--
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button class="btn btn-primary" onclick="triggerAction('agent')">⚡ بازبینی ایجنت</button>
+      <button class="btn btn-danger" onclick="triggerAction('flatten')">🛑 نقد کردن اضطراری</button>
+      <button class="btn" id="pauseBtn" onclick="triggerAction('pause')">⏸ توقف ورود</button>
+      <a href="/report" target="_blank" class="btn">📊 گزارش بک‌تست</a>
+      <a href="/export/trades.csv" class="btn btn-icon" title="دانلود اکسل معاملات">📥 CSV</a>
+      <button class="btn btn-icon" onclick="toggleTheme()" title="تغییر تم">🌓</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- Market Overview Ticker -->
+  <div class="ticker-bar" id="tickerBar">
+    <div class="ticker-item"><span class="ticker-label">تتر والکس:</span><span class="ticker-val" id="tkUsdt">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">تغییر ۱ ساعت تتر:</span><span class="ticker-val" id="tkUsdt1h">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">بایننس BTC:</span><span class="ticker-val" id="tkBtc5m">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">بایننس ETH:</span><span class="ticker-val" id="tkEth1h">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">رژیم کارمزد:</span><span class="ticker-val" id="tkFeeRegime">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">بازارهای فعال:</span><span class="ticker-val" id="tkTradable">—</span></div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-grid">
+    <div class="kpi-card highlight">
+      <div class="kpi-header"><span class="kpi-title">ارزش کل حساب (تومان)</span><span class="kpi-icon">💰</span></div>
+      <div class="kpi-value" id="kpiEquity">—</div>
+      <div class="kpi-sub">سرمایه اولیه: <span id="kpiCapital" style="direction:ltr">۵,۰۰۰,۰۰۰</span></div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header"><span class="kpi-title">بازده کل (Return)</span><span class="kpi-icon">📈</span></div>
+      <div class="kpi-value" id="kpiReturn">—</div>
+      <div class="kpi-sub" id="kpiRealizedPnl">سود محقق‌شده: —</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header"><span class="kpi-title">افت از سقف (Drawdown)</span><span class="kpi-icon">🛡️</span></div>
+      <div class="kpi-value" id="kpiDrawdown">—</div>
+      <div class="kpi-sub">سقف توقف اضطراری: ۶.۰٪-</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header"><span class="kpi-title">تومان آزاد و در دسترس</span><span class="kpi-icon">💵</span></div>
+      <div class="kpi-value" id="kpiFreeCash">—</div>
+      <div class="kpi-sub" id="kpiReservedCash">در صف خرید: —</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header"><span class="kpi-title">معاملات و وین‌ریت</span><span class="kpi-icon">🎯</span></div>
+      <div class="kpi-value" id="kpiWinRate">—</div>
+      <div class="kpi-sub" id="kpiTradesCount">تعداد معامله: ۰</div>
+    </div>
+
+    <div class="kpi-card">
+      <div class="kpi-header"><span class="kpi-title">وضعیت سیستم و AI</span><span class="kpi-icon">🤖</span></div>
+      <div class="kpi-value" id="kpiAiStatus" style="font-size:1.05rem;direction:rtl;text-align:right">فعال</div>
+      <div class="kpi-sub" id="kpiUptime">آپ‌تایم: —</div>
+    </div>
+  </div>
+
+  <!-- Main Dash Grid -->
+  <div class="dash-grid">
+    <!-- Left Column: Equity Chart & Tables -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <!-- Equity Curve Chart -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📊 منحنی تغییرات ارزش دارایی (تومان)</span>
+          <span style="font-size:0.75rem;color:var(--text-dim)">محاسبه لحظه‌ای Mark-to-Market</span>
+        </div>
+        <div class="panel-body">
+          <div class="chart-container" id="chartBox">
+            <div class="empty-hint">در حال ترسیم نمودار زنده...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Working Orders (Resting Maker Bids) -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">⏳ سفارش‌های فعال در صف خرید (Resting Maker Bids)</span>
+          <span class="badge-mode paper" id="ordersCountBadge">0 سفارش</span>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>بازار</th>
+                  <th>نوع</th>
+                  <th>قیمت سفارش (TMN)</th>
+                  <th>حجم</th>
+                  <th>ارزش (TMN)</th>
+                  <th>فاصله از قیمت منصفانه</th>
+                  <th>سن سفارش</th>
+                </tr>
+              </thead>
+              <tbody id="ordersTbody">
+                <tr><td colspan="7" class="empty-hint">هیچ سفارش خریدی در صف نیست</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Open Positions -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">💼 پوزیشن‌های باز معاملاتی (Open Positions)</span>
+          <span class="badge-mode live" id="posCountBadge">0 پوزیشن</span>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>بازار</th>
+                  <th>حجم موجودی</th>
+                  <th>قیمت خرید</th>
+                  <th>قیمت لحظه‌ای</th>
+                  <th>ارزش فعلی</th>
+                  <th>سود / زیان شناور</th>
+                  <th>حد ضرر</th>
+                  <th>هدف فروش (Target)</th>
+                  <th>مدت باز بودن</th>
+                </tr>
+              </thead>
+              <tbody id="positionsTbody">
+                <tr><td colspan="9" class="empty-hint">در حال حاضر هیچ پوزیشن بازی وجود ندارد</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Closed Trades Table -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📜 سابقه معاملات بسته‌شده</span>
+          <a href="/export/trades.csv" style="font-size:0.75rem;color:var(--primary);text-decoration:none">دانلود کل تاریخچه (CSV)</a>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>بازار</th>
+                  <th>قیمت ورود</th>
+                  <th>قیمت خروج</th>
+                  <th>حجم</th>
+                  <th>سود خالص (TMN)</th>
+                  <th>بازده معامله</th>
+                  <th>علت خروج</th>
+                  <th>زمان خروج</th>
+                </tr>
+              </thead>
+              <tbody id="tradesTbody">
+                <tr><td colspan="8" class="empty-hint">هنوز معامله بسته‌شده‌ای ثبت نشده است</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Opportunity Radar, AI Policy & Live Feed -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      <!-- AI Agent Policy Box -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">🧠 سیاست جاری ایجنت هوشمند (Claude Opus)</span>
+          <span class="status-pill" id="agentLastRun" style="font-size:0.7rem">آخرین بررسی: —</span>
+        </div>
+        <div class="panel-body">
+          <div class="policy-box">
+            <div class="policy-header">
+              <span class="policy-mode" id="policyMode">حالت: عادی (Normal)</span>
+              <div class="policy-multipliers">
+                <span>ضریب حجم: <b id="polSize">۱.۰×</b></span>
+                <span>ضریب تخفیف: <b id="polEdge">۱.۰×</b></span>
+              </div>
+            </div>
+            <div class="policy-rationale" id="policyRationale">
+              استراتژی بازگشت به پریمیوم منصفانه با پارامترهای ایمن فعال است.
+            </div>
+          </div>
+          <div style="font-size:0.78rem;font-weight:600;margin-bottom:6px;color:var(--text-muted)">آخرین دیدگاه ایجنت:</div>
+          <div id="agentReviewsList" class="feed-list" style="max-height:180px;">
+            <div class="empty-hint">در انتظار گزارش تحلیلی ایجنت...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Opportunities Radar -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">🎯 رادار فرصت‌های زنده (Ranked Arbitrage)</span>
+          <span style="font-size:0.72rem;color:var(--text-dim)">بر اساس امتیاز بازگشت</span>
+        </div>
+        <div class="panel-body" style="padding:0">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>بازار</th>
+                  <th>فاصله فعلی</th>
+                  <th>لبه خرید</th>
+                  <th>نرخ بازگشت</th>
+                  <th>وضعیت</th>
+                </tr>
+              </thead>
+              <tbody id="oppsTbody">
+                <tr><td colspan="5" class="empty-hint">در حال تحلیل بازارها...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Decision Feed -->
+      <div class="panel" style="flex:1;">
+        <div class="panel-header">
+          <span class="panel-title">⚡ لاگ زنده تصمیمات الگوریتمی</span>
+          <a href="/export/decisions.jsonl" target="_blank" style="font-size:0.75rem;color:var(--primary);text-decoration:none">JSONL</a>
+        </div>
+        <div class="panel-body">
+          <div class="feed-list" id="feedList">
+            <div class="empty-hint">در حال دریافت لاگ‌های لحظه‌ای...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- Action Confirmation Modal -->
+<div class="modal-backdrop" id="actionModal">
+  <div class="modal">
+    <div class="modal-title" id="modalTitle">تأیید اقدام</div>
+    <div class="modal-desc" id="modalDesc">برای اجرای این دستور، رمز عبور داشبورد را وارد کنید.</div>
+    <input type="password" id="modalPassword" class="modal-input" placeholder="رمز عبور DASHBOARD_PASSWORD">
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">انصراف</button>
+      <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModalAction()">تأیید و اجرا</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// State
+let challengeEndTime = 0;
+let currentPendingAction = '';
+let savedPassword = sessionStorage.getItem('pishro_dashboard_pw') || '';
+
+// Helpers
+const fmtNum = (x, dec=0) => (x == null || isNaN(x)) ? '—' : Number(x).toLocaleString('en-US', {maximumFractionDigits: dec, minimumFractionDigits: dec});
+const fmtPct = (x, dec=2) => (x == null || isNaN(x)) ? '—' : (x > 0 ? '+' : '') + fmtNum(x, dec) + '%';
+const fmtTmn = x => fmtNum(x, 0) + ' ت';
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtTime = ts => ts ? new Date(ts * 1000).toLocaleTimeString('fa-IR', {timeZone: 'Asia/Tehran'}) : '—';
+const fmtFullTime = ts => ts ? new Date(ts * 1000).toLocaleString('fa-IR', {timeZone: 'Asia/Tehran'}) : '—';
+
+function showToast(msg) {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  container.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+}
+
+// Fetch helper
+async function apiGet(path) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return await res.json();
+}
+
+// Theme
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  const next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('pishro_theme', next);
+}
+const savedTheme = localStorage.getItem('pishro_theme');
+if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
+
+// Countdown Timer
+function updateCountdown() {
+  if (!challengeEndTime) return;
+  const now = Date.now() / 1000;
+  const diff = challengeEndTime - now;
+  const el = document.getElementById('challengeCountdown');
+  if (diff <= 0) {
+    el.textContent = '⏱ پایان مسابقه';
+    el.style.color = '#ef4444';
+    return;
+  }
+  const hrs = Math.floor(diff / 3600);
+  const mins = Math.floor((diff % 3600) / 60);
+  const secs = Math.floor(diff % 60);
+  el.textContent = `⌛ ${String(hrs).padStart(2,'0')}:${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+}
+setInterval(updateCountdown, 1000);
+
+// Render Chart
+function renderEquityChart(rows) {
+  const box = document.getElementById('chartBox');
+  if (!rows || rows.length < 2) {
+    box.innerHTML = '<div class="empty-hint">در حال جمع‌آوری داده‌های منحنی ارزش دارایی...</div>';
+    return;
+  }
+  const w = box.clientWidth || 640;
+  const h = 230;
+  const values = rows.map(r => r.equity);
+  const minVal = Math.min(...values);
+  const maxVal = Math.max(...values);
+  const range = maxVal - minVal || 1;
+  const pad = range * 0.1;
+  const yMin = minVal - pad;
+  const yMax = maxVal + pad;
+
+  const getX = idx => (45 + (idx / (rows.length - 1)) * (w - 60)).toFixed(1);
+  const getY = val => (h - 25 - ((val - yMin) / (yMax - yMin)) * (h - 50)).toFixed(1);
+
+  const points = rows.map((r, i) => `${getX(i)},${getY(r.equity)}`).join(' ');
+  const areaPoints = `${getX(0)},${h - 25} ` + points + ` ${getX(rows.length - 1)},${h - 25}`;
+
+  const isUp = values[values.length - 1] >= values[0];
+  const strokeColor = isUp ? '#10b981' : '#ef4444';
+  const gradId = isUp ? 'gradUp' : 'gradDown';
+
+  box.innerHTML = `
+    <svg class="chart" viewBox="0 0 ${w} ${h}">
+      <defs>
+        <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0.0"/>
+        </linearGradient>
+      </defs>
+      <!-- Grid Lines -->
+      <line x1="45" y1="${getY(maxVal)}" x2="${w-15}" y2="${getY(maxVal)}" stroke="var(--border-subtle)" stroke-dasharray="3 3"/>
+      <line x1="45" y1="${getY(minVal)}" x2="${w-15}" y2="${getY(minVal)}" stroke="var(--border-subtle)" stroke-dasharray="3 3"/>
+      <text x="40" y="${getY(maxVal)}" fill="var(--text-dim)" font-size="10" text-anchor="end">${fmtNum(maxVal)}</text>
+      <text x="40" y="${getY(minVal)}" fill="var(--text-dim)" font-size="10" text-anchor="end">${fmtNum(minVal)}</text>
+      <!-- Area Fill -->
+      <polygon points="${areaPoints}" fill="url(#${gradId})" />
+      <!-- Line -->
+      <polyline points="${points}" fill="none" stroke="${strokeColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `;
+}
+
+// Refresh Main Data
+async function refreshDashboard() {
+  try {
+    const s = await apiGet('/api/status');
+    challengeEndTime = s.hours_left ? (Date.now() / 1000 + s.hours_left * 3600) : 0;
+
+    // Mode Badge
+    const modeBadge = document.getElementById('modeBadge');
+    const modeText = document.getElementById('modeText');
+    if (s.mode === 'live') {
+      modeBadge.className = 'badge-mode live';
+      modeText.textContent = 'پول واقعی (Live)';
+    } else {
+      modeBadge.className = 'badge-mode paper';
+      modeText.textContent = 'تست سایه (Paper)';
+    }
+
+    // Subtitle
+    document.getElementById('headerSubtitle').textContent = 
+      `وضعیت: ${s.status} · ${s.tradable_markets} بازار تومانی · کارمزد: ${s.fee_regime} ${s.halted ? '· ⛔ توقف: ' + s.halted : ''}`;
+
+    // Header Status
+    document.getElementById('dataAge').textContent = s.data_age_s != null ? `${s.data_age_s}s` : '—';
+    document.getElementById('orderLatency').textContent = s.order_latency_ms_p50 ? `${Math.round(s.order_latency_ms_p50)}ms` : '—';
+
+    // Pause button state
+    const pauseBtn = document.getElementById('pauseBtn');
+    if (s.paused || s.policy.mode === 'halt_entries') {
+      pauseBtn.textContent = '▶ ادامه ورود';
+      pauseBtn.className = 'btn btn-primary';
+    } else {
+      pauseBtn.textContent = '⏸ توقف ورود';
+      pauseBtn.className = 'btn';
+    }
+
+    // KPIs
+    const eqEl = document.getElementById('kpiEquity');
+    eqEl.textContent = fmtNum(s.equity_tmn);
+    document.getElementById('kpiCapital').textContent = fmtNum(s.capital_tmn);
+
+    const retEl = document.getElementById('kpiReturn');
+    retEl.textContent = fmtPct(s.return_pct);
+    retEl.className = 'kpi-value ' + (s.return_pct >= 0 ? 'pos' : 'neg');
+    document.getElementById('kpiRealizedPnl').innerHTML = `سود محقق‌شده: <b class="${s.realized_pnl_tmn >= 0 ? 'pos' : 'neg'}">${fmtNum(s.realized_pnl_tmn)} ت</b>`;
+
+    const ddEl = document.getElementById('kpiDrawdown');
+    ddEl.textContent = fmtPct(-s.drawdown_pct);
+    ddEl.className = 'kpi-value ' + (s.drawdown_pct > 0.5 ? 'neg' : '');
+
+    document.getElementById('kpiFreeCash').textContent = fmtNum(s.free_tmn);
+    const reservedTmn = Math.max(0, (s.equity_tmn - s.free_tmn) || 0);
+    document.getElementById('kpiReservedCash').textContent = `در صف سفارش: ${fmtNum(reservedTmn)} ت`;
+
+    document.getElementById('kpiWinRate').textContent = s.win_rate_pct != null ? `${fmtNum(s.win_rate_pct, 1)}%` : '—';
+    document.getElementById('kpiTradesCount').textContent = `تعداد کل معاملات: ${s.trades}`;
+
+    document.getElementById('kpiAiStatus').innerHTML = `Claude: ${s.ai_agent ? '<span class="pos">فعال</span>' : '<span class="neg">خاموش</span>'} · ML: ${s.ml_model ? '<span class="pos">روشن</span>' : '<span style="color:var(--text-dim)">خاموش</span>'}`;
+    document.getElementById('kpiUptime').textContent = `آپ‌تایم: ${fmtNum(s.uptime_h, 1)} ساعت`;
+
+    // Working Orders Table
+    const orders = s.working_orders || [];
+    document.getElementById('ordersCountBadge').textContent = `${orders.length} سفارش فعال`;
+    const ordersTbody = document.getElementById('ordersTbody');
+    if (orders.length === 0) {
+      ordersTbody.innerHTML = '<tr><td colspan="7" class="empty-hint">در حال حاضر هیچ سفارشی در صف خرید منتظر نیست</td></tr>';
+    } else {
+      ordersTbody.innerHTML = orders.map(o => `
+        <tr>
+          <td><span class="market-tag">${escHtml(o.symbol)}</span></td>
+          <td><span class="badge-mode paper">${o.mode === 'maker' ? 'میکر' : 'تیکر'}</span></td>
+          <td style="color:#60a5fa">${fmtNum(o.price, 2)}</td>
+          <td>${fmtNum(o.qty, 4)}</td>
+          <td>${fmtNum(o.price * o.qty)}</td>
+          <td class="pos">${fmtPct(o.edge * 100)}</td>
+          <td style="color:var(--text-dim)">${o.age_s} ثانیه قبل</td>
+        </tr>
+      `).join('');
+    }
+
+    // Open Positions Table
+    const positions = s.positions || [];
+    document.getElementById('posCountBadge').textContent = `${positions.length} پوزیشن`;
+    const posTbody = document.getElementById('positionsTbody');
+    if (positions.length === 0) {
+      posTbody.innerHTML = '<tr><td colspan="9" class="empty-hint">هیچ پوزیشن بازی وجود ندارد (تمام سرمایه به تومان است)</td></tr>';
+    } else {
+      posTbody.innerHTML = positions.map(p => {
+        const pnlCls = p.unrealized_pct >= 0 ? 'pos' : 'neg';
+        return `
+          <tr>
+            <td><span class="market-tag">${escHtml(p.symbol)}</span></td>
+            <td>${fmtNum(p.qty, 4)}</td>
+            <td>${fmtNum(p.entry, 2)}</td>
+            <td>${fmtNum(p.bid, 2)}</td>
+            <td>${fmtNum(p.value_tmn)}</td>
+            <td class="${pnlCls}"><b>${fmtPct(p.unrealized_pct)}</b> (${fmtNum(p.unrealized_tmn)} ت)</td>
+            <td class="neg">${fmtNum(p.stop, 2)}</td>
+            <td class="pos">${fmtNum(p.exit_order, 2)}</td>
+            <td style="color:var(--text-dim)">${fmtNum(p.age_min, 0)} دقیقه</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // Policy Box
+    const pol = s.policy || {};
+    document.getElementById('policyMode').textContent = `حالت ایجنت: ${pol.mode || 'عادی'}`;
+    document.getElementById('polSize').textContent = `${fmtNum(pol.size_mult, 2)}×`;
+    document.getElementById('polEdge').textContent = `${fmtNum(pol.edge_mult, 2)}×`;
+    document.getElementById('policyRationale').textContent = pol.rationale || 'سیاست عادی برقرار است.';
+
+  } catch (err) {
+    console.error('Status fetch error:', err);
+  }
+
+  // Ticker Overview
+  try {
+    const ov = await apiGet('/api/overview');
+    document.getElementById('tkUsdt').textContent = fmtNum(ov.usdt_tmn) + ' ت';
+    const usdt1h = document.getElementById('tkUsdt1h');
+    usdt1h.textContent = fmtPct(ov.usdt_ret_1h_pct);
+    usdt1h.className = 'ticker-val ' + (ov.usdt_ret_1h_pct >= 0 ? 'pos' : 'neg');
+
+    const btcEl = document.getElementById('tkBtc5m');
+    btcEl.textContent = fmtPct(ov.btc_ret_5m_pct);
+    btcEl.className = 'ticker-val ' + (ov.btc_ret_5m_pct >= 0 ? 'pos' : 'neg');
+
+    const ethEl = document.getElementById('tkEth1h');
+    ethEl.textContent = fmtPct(ov.eth_ret_1h_pct);
+    ethEl.className = 'ticker-val ' + (ov.eth_ret_1h_pct >= 0 ? 'pos' : 'neg');
+
+    document.getElementById('tkFeeRegime').textContent = ov.fee_regime || 'عادی';
+    document.getElementById('tkTradable').textContent = ov.tradable_markets || '—';
+  } catch (e) {}
+
+  // Opportunities
+  try {
+    const opps = await apiGet('/api/opportunities?limit=10');
+    const oppsTbody = document.getElementById('oppsTbody');
+    if (opps && opps.length) {
+      oppsTbody.innerHTML = opps.map(o => `
+        <tr>
+          <td><span class="market-tag">${escHtml(o.symbol)}</span></td>
+          <td class="${o.dev_now_pct < 0 ? 'pos' : 'neg'}">${fmtPct(o.dev_now_pct)}</td>
+          <td class="pos">${fmtPct(o.edge_pct)}</td>
+          <td>${fmtNum(o.revert_rate * 100, 0)}%</td>
+          <td>${o.resting ? '<span class="badge-mode live">در صف</span>' : '<span style="color:var(--text-dim)">رصد</span>'}</td>
+        </tr>
+      `).join('');
+    }
+  } catch (e) {}
+
+  // Decisions Feed
+  try {
+    const decs = await apiGet('/api/decisions?limit=30');
+    const feedList = document.getElementById('feedList');
+    if (decs && decs.length) {
+      feedList.innerHTML = decs.map(d => `
+        <div class="feed-item">
+          <div class="feed-meta">
+            <span class="feed-tag ${escHtml(d.kind)}">${escHtml(d.kind)}</span>
+            <b style="color:var(--text-main);direction:ltr">${escHtml(d.symbol || '')}</b>
+            <span class="feed-time">${escHtml(d.time_tehran || '')}</span>
+          </div>
+          <div class="feed-text">${escHtml(d.reason || '')}</div>
+        </div>
+      `).join('');
+    }
+  } catch (e) {}
+
+  // Agent Reviews
+  try {
+    const ags = await apiGet('/api/agent?limit=4');
+    const agList = document.getElementById('agentReviewsList');
+    if (ags && ags.length) {
+      document.getElementById('agentLastRun').textContent = `آخرین بررسی: ${fmtTime(ags[0].ts)}`;
+      agList.innerHTML = ags.map(a => `
+        <div class="feed-item">
+          <div class="feed-meta">
+            <span class="feed-tag agent_review">تحلیل ایجنت</span>
+            <span class="feed-time">${fmtTime(a.ts)}</span>
+          </div>
+          <div class="feed-text" style="color:var(--text-muted)">${escHtml(a.rationale || '—')}</div>
+        </div>
+      `).join('');
+    }
+  } catch (e) {}
+
+  // Trades History
+  try {
+    const trs = await apiGet('/api/trades?limit=25');
+    const trTbody = document.getElementById('tradesTbody');
+    if (trs && trs.length) {
+      trTbody.innerHTML = trs.map(t => {
+        const isWin = t.pnl_tmn >= 0;
+        return `
+          <tr>
+            <td><span class="market-tag">${escHtml(t.symbol)}</span></td>
+            <td>${fmtNum(t.entry_price, 2)}</td>
+            <td>${fmtNum(t.exit_price, 2)}</td>
+            <td>${fmtNum(t.qty, 4)}</td>
+            <td class="${isWin ? 'pos' : 'neg'}"><b>${fmtNum(t.pnl_tmn)} ت</b></td>
+            <td class="${isWin ? 'pos' : 'neg'}">${fmtPct(t.ret * 100, 2)}</td>
+            <td style="color:var(--text-dim)">${escHtml(t.reason_out || '—')}</td>
+            <td style="color:var(--text-dim);direction:ltr">${fmtTime(t.exit_ts)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } catch (e) {}
+
+  // Equity Chart
+  try {
+    const eqRows = await apiGet('/api/equity');
+    renderEquityChart(eqRows);
+  } catch (e) {}
+}
+
+// Modal and Controls
+function triggerAction(action) {
+  currentPendingAction = action;
+  const titles = {
+    agent: 'درخواست بازبینی فوری از ایجنت Claude',
+    flatten: '🚨 تبدیل تمام دارایی‌ها به تومان (نقد کردن اضطراری)',
+    pause: 'توقف ثبت سفارش‌های جدید',
+    resume: 'ادامه و از سرگیری ثبت سفارش‌ها'
+  };
+  const descs = {
+    agent: 'ایجنت وضعیت زنده بازار را سریعاً بررسی کرده و در صورت لزوم سیاست را به‌روز می‌کند.',
+    flatten: 'همه پوزیشن‌های باز و سفارش‌های منتظر لغو شده و کل ارزها به تومان فروخته می‌شوند.',
+    pause: 'ورود به معاملات جدید موقتاً متوقف می‌شود؛ پوزیشن‌های قبلی طبق استراتژی مدیریت خواهند شد.',
+    resume: 'محدودیت توقف ورود برداشته شده و ربات سفارش‌گذاری را از سر می‌گیرد.'
+  };
+
+  // If action is pause and already paused, switch to resume
+  const pauseBtn = document.getElementById('pauseBtn');
+  if (action === 'pause' && pauseBtn.textContent.includes('ادامه')) {
+    currentPendingAction = 'resume';
+  }
+
+  document.getElementById('modalTitle').textContent = titles[currentPendingAction] || 'کنترل دستی';
+  document.getElementById('modalDesc').textContent = descs[currentPendingAction] || 'لطفاً رمز عبور را تأیید کنید.';
+
+  if (savedPassword) {
+    document.getElementById('modalPassword').value = savedPassword;
+  }
+  document.getElementById('actionModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('actionModal').classList.remove('show');
+}
+
+async function confirmModalAction() {
+  const pw = document.getElementById('modalPassword').value;
+  if (!pw) {
+    alert('رمز عبور الزامی است.');
+    return;
+  }
+  savedPassword = pw;
+  sessionStorage.setItem('pishro_dashboard_pw', pw);
+  closeModal();
+
+  try {
+    const res = await fetch(`/api/control/${currentPendingAction}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Basic ' + btoa('admin:' + pw)
+      }
+    });
+    if (res.ok) {
+      showToast(`دستور با موفقیت اجرا شد.`);
+      refreshDashboard();
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(`خطا در اجرای دستور (${res.status}): ${err.detail || 'رمز نادرست است'}`);
+    }
+  } catch (e) {
+    alert(`خطای ارتباط با سرور: ${e.message}`);
+  }
+}
+
+// Init
+refreshDashboard();
+setInterval(refreshDashboard, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "mode": "paper_live_prices",
+  "private_requests": 0,
+  "real_orders": 0,
+  "duration_seconds": 600.47,
+  "stages": {
+    "warmup_started_utc": "2026-10-23T14:04:26.482192+00:00",
+    "warmup_complete": true,
+    "observation_started_utc": "2026-10-23T14:05:09.024467+00:00"
+  },
+  "initial_equity_tmn": 5000000.0,
+  "final_marked_equity_tmn": 5000000.0,
+  "marked_pnl_tmn": 0.0,
+  "estimated_liquidation_pnl_tmn": 0.0,
+  "realized_pnl_tmn": 0,
+  "closed_trades": 0,
+  "winning_trades": 0,
+  "positions": [],
+  "ticks": 260,
+  "errors": 1,
+  "error_types": {
+    "TimeoutError": 1
+  },
+  "events": {
+    "buy_order": 9,
+    "cancel_buy": 9
+  },
+  "candidate_tick_observations": 3171,
+  "blocked_tick_observations": {
+    "regime": 382,
+    "refs_disagree": 620,
+    "shock_ref": 597,
+    "spread": 170
+  },
+  "markets": 19,
+  "warm_states": 19,
+  "fee_fallback": [
+    0.0025,
+    0.003
+  ],
+  "ai_enabled": false,
+  "ml_enabled": false,
+  "public_requests": {
+    "v1/markets": 262,
+    "v1/udf/history": 132
+  },
+  "limits": "Paper fills omit real queue position and exchange latency. Ten minutes cannot establish profitability."
+}

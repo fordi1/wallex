@@ -1,8 +1,0 @@
-ERROR: candle history outage of 10:19:00 after 2026-10-19T21:50:00+00:00
-AI credentials are absent; running deterministic AI-off baseline.
-Backtest complete: bt-BTCTMN-20261022T183724Z-2463ba
-Report: reports\bt-BTCTMN-20261022T183724Z-2463ba.md
-Interactive: reports\bt-BTCTMN-20261022T183724Z-2463ba.html
-Backtest complete: bt-ETHTMN-20261022T184219Z-61d47a
-Report: reports\bt-ETHTMN-20261022T184219Z-61d47a.md
-Interactive: reports\bt-ETHTMN-20261022T184219Z-61d47a.html
